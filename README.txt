@@ -1,0 +1,2 @@
+Note that sample_75_02.dta, sample_nebenr.dta and work_history.dta have been removed from the folder to keep the file size manageable for email.
+They should be placed in the data/raw directory for the do-files to run correctly.

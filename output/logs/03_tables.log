@@ -1,0 +1,634 @@
+-----------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/logs/03_tables.log
+  log type:  text
+ opened on:  15 Mar 2026, 01:30:20
+
+. 
+. use "$clean/analysis_dataset.dta", clear
+
+. 
+. *---------------------
+. * Set up survival data
+. *--------------------
+. 
+. stset noneduration, failure(censored == 0)
+
+Survival-time data settings
+
+         Failure event: censored==0
+Observed time interval: (0, noneduration]
+     Exit on or before: failure
+
+--------------------------------------------------------------------------
+    650,922  total observations
+          0  exclusions
+--------------------------------------------------------------------------
+    650,922  observations remaining, representing
+    335,047  failures in single-record/single-failure data
+  341678305  total analysis time at risk and under observation
+                                                At risk from t =         0
+                                     Earliest observed entry t =         0
+                                          Last observed exit t =     8,214
+
+. 
+. *-----------------------
+. * Define covariate lists
+. *----------------------
+. 
+. * RD polynomial controls (always included in every column)
+. local rd_poly  "sp_poly1 sp_poly2 sp_poly3 sp_x_poly1 sp_x_poly2 sp_x_poly3"
+
+. local rd_poly  "`rd_poly' eb_poly1 eb_poly2 eb_poly3 eb_x_poly1 eb_x_poly2 eb_x_poly3"
+
+. * Basic controls (Columns 2, 4, 5)
+. local basic_controls "female married austrian bluecollar age age_sq"
+
+. local basic_controls "`basic_controls' log_wage log_wage_sq"
+
+. local basic_controls "`basic_controls' mo_fe2-mo_fe12 yr_fe2-yr_fe21"
+
+. * Full controls (Column 3): basic controls PLUS firm/worker history variables
+. * Check availability of full-control variables
+. foreach v in dg_size experience experience_sq prev_bluecollar last_recall ///
+>              prev_had_nonedur last_nonedur n_spells above_basic_ed {
+  2.     capture confirm variable `v'
+  3.     if _rc != 0 {
+  4.         display as error "WARNING: `v' not found — Column 3 may have issues"
+  5.     }
+  6. }
+
+. * Build the full-control variable list
+. local full_controls "`basic_controls'"
+
+. local full_controls "`full_controls' dg_size experience experience_sq"
+
+. local full_controls "`full_controls' had_prior_job"
+
+. local full_controls "`full_controls' prev_bluecollar last_recall"
+
+. local full_controls "`full_controls' prev_had_nonedur last_nonedur n_spells"
+
+. local full_controls "`full_controls' above_basic_ed"
+
+. local full_controls "`full_controls' iagrmining icarsales ihotel imanufact iservice itranspor
+> t iwholesale"
+
+. local full_controls "`full_controls' region_fe2-region_fe6"
+
+. 
+. 
+. *-----------------------------------
+. * Column 1: No controls, full sample
+. *------------------------------------
+. eststo col1: stcox sp_eligible eb_eligible `rd_poly', nohr vce(cluster penr)
+
+        Failure _d: censored==0
+  Analysis time _t: noneduration
+
+Iteration 0:  Log pseudolikelihood = -4379351.3
+Iteration 1:  Log pseudolikelihood = -4377294.1
+Iteration 2:  Log pseudolikelihood = -4377285.4
+Iteration 3:  Log pseudolikelihood = -4377285.4
+Refining estimates:
+Iteration 0:  Log pseudolikelihood = -4377285.4
+
+Cox regression with Breslow method for ties
+
+No. of subjects =   650,922                            Number of obs = 650,922
+No. of failures =   335,047
+Time at risk    = 341678305
+                                                       Wald chi2(14) = 4206.00
+Log pseudolikelihood = -4377285.4                      Prob > chi2   =  0.0000
+
+                             (Std. err. adjusted for 549,398 clusters in penr)
+------------------------------------------------------------------------------
+             |               Robust
+          _t | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ sp_eligible |  -.1248791   .0167978    -7.43   0.000    -.1578022   -.0919559
+ eb_eligible |  -.0934989   .0156228    -5.98   0.000    -.1241191   -.0628788
+    sp_poly1 |   .2222008   .0418464     5.31   0.000     .1401834    .3042183
+    sp_poly2 |   .2978503   .0447659     6.65   0.000     .2101107      .38559
+    sp_poly3 |   .0899557   .0138522     6.49   0.000     .0628059    .1171055
+  sp_x_poly1 |  -.2118079   .0741125    -2.86   0.004    -.3570657   -.0665502
+  sp_x_poly2 |  -.3799559   .0884209    -4.30   0.000    -.5532576   -.2066542
+  sp_x_poly3 |  -.0785704   .0298057    -2.64   0.008    -.1369886   -.0201522
+    eb_poly1 |   .1910139   .0520361     3.67   0.000     .0890251    .2930027
+    eb_poly2 |   .2758071   .0621823     4.44   0.000     .1539321     .397682
+    eb_poly3 |   .1134827   .0209373     5.42   0.000     .0724463    .1545191
+  eb_x_poly1 |  -.1497782   .0668473    -2.24   0.025    -.2807965   -.0187598
+  eb_x_poly2 |  -.3308761   .0767786    -4.31   0.000    -.4813595   -.1803927
+  eb_x_poly3 |  -.0516115   .0251117    -2.06   0.040    -.1008295   -.0023935
+------------------------------------------------------------------------------
+
+. 
+. *-------------------------------------
+. * Column 2: Basic controls, full sample
+. *--------------------------------------
+. eststo col2: stcox sp_eligible eb_eligible `rd_poly' `basic_controls', ///
+>     nohr vce(cluster penr)
+
+        Failure _d: censored==0
+  Analysis time _t: noneduration
+
+Iteration 0:  Log pseudolikelihood = -3798250.7
+Iteration 1:  Log pseudolikelihood = -3779857.2
+Iteration 2:  Log pseudolikelihood = -3779617.5
+Iteration 3:  Log pseudolikelihood = -3779604.8
+Iteration 4:  Log pseudolikelihood = -3779604.8
+Refining estimates:
+Iteration 0:  Log pseudolikelihood = -3779604.8
+
+Cox regression with Breslow method for ties
+
+No. of subjects =   565,835                           Number of obs =  565,835
+No. of failures =   293,818
+Time at risk    = 258213057
+                                                      Wald chi2(53) = 35137.84
+Log pseudolikelihood = -3779604.8                     Prob > chi2   =   0.0000
+
+                             (Std. err. adjusted for 469,713 clusters in penr)
+------------------------------------------------------------------------------
+             |               Robust
+          _t | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ sp_eligible |  -.1148237    .018037    -6.37   0.000    -.1501756   -.0794718
+ eb_eligible |  -.0637399   .0166337    -3.83   0.000    -.0963414   -.0311384
+    sp_poly1 |   .1886705   .0445944     4.23   0.000     .1012672    .2760738
+    sp_poly2 |   .2528399   .0476613     5.30   0.000     .1594254    .3462544
+    sp_poly3 |   .0793197   .0147431     5.38   0.000     .0504237    .1082158
+  sp_x_poly1 |  -.2356191    .079596    -2.96   0.003    -.3916245   -.0796137
+  sp_x_poly2 |  -.2859644    .095073    -3.01   0.003     -.472304   -.0996247
+  sp_x_poly3 |  -.0808695   .0320951    -2.52   0.012    -.1437746   -.0179643
+    eb_poly1 |   .1377838   .0557594     2.47   0.013     .0284974    .2470702
+    eb_poly2 |   .0985705   .0668752     1.47   0.140    -.0325024    .2296435
+    eb_poly3 |   .0316571   .0226003     1.40   0.161    -.0126387    .0759528
+  eb_x_poly1 |  -.0981046   .0713401    -1.38   0.169    -.2379287    .0417195
+  eb_x_poly2 |  -.0632459   .0822421    -0.77   0.442    -.2244376    .0979457
+  eb_x_poly3 |   .0011203   .0269984     0.04   0.967    -.0517955    .0540361
+      female |   -.109004   .0044822   -24.32   0.000    -.1177889   -.1002191
+     married |   .0153067   .0044377     3.45   0.001     .0066089    .0240045
+    austrian |    -.14675    .005847   -25.10   0.000      -.15821     -.13529
+  bluecollar |   .2140662   .0042918    49.88   0.000     .2056544    .2224779
+         age |  -.1339005   .0021965   -60.96   0.000    -.1382055   -.1295954
+      age_sq |   .0015324   .0000323    47.46   0.000     .0014691    .0015956
+    log_wage |     1.9438   .1738067    11.18   0.000     1.603145    2.284455
+ log_wage_sq |  -.1338617   .0126204   -10.61   0.000    -.1585972   -.1091262
+      mo_fe2 |  -.0171861   .0095699    -1.80   0.073    -.0359427    .0015706
+      mo_fe3 |  -.0905732   .0091455    -9.90   0.000     -.108498   -.0726484
+      mo_fe4 |  -.0956399   .0096297    -9.93   0.000    -.1145138    -.076766
+      mo_fe5 |  -.1212596    .009731   -12.46   0.000    -.1403321   -.1021872
+      mo_fe6 |  -.1382078   .0091555   -15.10   0.000    -.1561522   -.1202634
+      mo_fe7 |  -.1106972   .0094791   -11.68   0.000     -.129276   -.0921184
+      mo_fe8 |  -.1536922   .0097021   -15.84   0.000    -.1727079   -.1346765
+      mo_fe9 |  -.1977584    .009204   -21.49   0.000     -.215798   -.1797188
+     mo_fe10 |  -.2240588   .0093177   -24.05   0.000    -.2423211   -.2057965
+     mo_fe11 |  -.2025393   .0092832   -21.82   0.000     -.220734   -.1843447
+     mo_fe12 |  -.0572626   .0084304    -6.79   0.000    -.0737859   -.0407393
+      yr_fe2 |  -.2032204   .0192793   -10.54   0.000    -.2410071   -.1654338
+      yr_fe3 |  -.2101094   .0192728   -10.90   0.000    -.2478834   -.1723355
+      yr_fe4 |  -.1027276   .0188391    -5.45   0.000    -.1396516   -.0658036
+      yr_fe5 |  -.0602402    .018374    -3.28   0.001    -.0962526   -.0242277
+      yr_fe6 |  -.0478269   .0171331    -2.79   0.005    -.0814072   -.0142467
+      yr_fe7 |   .0183971   .0166723     1.10   0.270    -.0142799    .0510741
+      yr_fe8 |   .1363699   .0164975     8.27   0.000     .1040354    .1687045
+      yr_fe9 |   .2486034   .0166126    14.96   0.000     .2160433    .2811636
+     yr_fe10 |   .1820512   .0164101    11.09   0.000      .149888    .2142144
+     yr_fe11 |   .1981555   .0161241    12.29   0.000     .1665528    .2297582
+     yr_fe12 |   .1864877   .0158458    11.77   0.000     .1554304     .217545
+     yr_fe13 |   .1570313   .0157431     9.97   0.000     .1261754    .1878872
+     yr_fe14 |   .2483165   .0159155    15.60   0.000     .2171227    .2795103
+     yr_fe15 |   .2131675   .0159334    13.38   0.000     .1819386    .2443965
+     yr_fe16 |   .1452354   .0160003     9.08   0.000     .1138753    .1765954
+     yr_fe17 |   .1326935   .0161028     8.24   0.000     .1011326    .1642543
+     yr_fe18 |   .1998617   .0161337    12.39   0.000     .1682403    .2314832
+     yr_fe19 |   .3125988   .0165176    18.93   0.000      .280225    .3449727
+     yr_fe20 |   .3676104   .0166845    22.03   0.000     .3349094    .4003113
+     yr_fe21 |   .2304294    .016768    13.74   0.000     .1975648     .263294
+------------------------------------------------------------------------------
+
+. 
+. *-------------------------------------
+. * Column 3: Full controls, full sample
+. *--------------------------------------
+. eststo col3: stcox sp_eligible eb_eligible `rd_poly' `full_controls', ///
+>     nohr vce(cluster penr)
+
+        Failure _d: censored==0
+  Analysis time _t: noneduration
+
+Iteration 0:  Log pseudolikelihood = -3404215.9
+Iteration 1:  Log pseudolikelihood = -3383778.4
+Iteration 2:  Log pseudolikelihood = -3383435.8
+Iteration 3:  Log pseudolikelihood =   -3383426
+Iteration 4:  Log pseudolikelihood =   -3383426
+Refining estimates:
+Iteration 0:  Log pseudolikelihood =   -3383426
+
+Cox regression with Breslow method for ties
+
+No. of subjects =   509,355                           Number of obs =  509,355
+No. of failures =   265,530
+Time at risk    = 230122875
+                                                      Wald chi2(74) = 36745.19
+Log pseudolikelihood = -3383426                       Prob > chi2   =   0.0000
+
+                                  (Std. err. adjusted for 427,895 clusters in penr)
+-----------------------------------------------------------------------------------
+                  |               Robust
+               _t | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+      sp_eligible |  -.0942825   .0190972    -4.94   0.000    -.1317124   -.0568527
+      eb_eligible |  -.0664467   .0175295    -3.79   0.000    -.1008039   -.0320894
+         sp_poly1 |   .1306156   .0470357     2.78   0.005     .0384273    .2228038
+         sp_poly2 |   .2022638   .0502144     4.03   0.000     .1038454    .3006822
+         sp_poly3 |   .0641705    .015534     4.13   0.000     .0337245    .0946166
+       sp_x_poly1 |  -.2387071   .0841394    -2.84   0.005    -.4036174   -.0737968
+       sp_x_poly2 |  -.1481435   .1003747    -1.48   0.140    -.3448743    .0485872
+       sp_x_poly3 |   -.101673   .0338688    -3.00   0.003    -.1680547   -.0352913
+         eb_poly1 |   .1499157    .058868     2.55   0.011     .0345367    .2652948
+         eb_poly2 |   .1041456   .0706699     1.47   0.141    -.0343648     .242656
+         eb_poly3 |   .0358776   .0239565     1.50   0.134    -.0110763    .0828315
+       eb_x_poly1 |  -.0626764   .0752482    -0.83   0.405    -.2101602    .0848074
+       eb_x_poly2 |  -.1275714   .0868248    -1.47   0.142    -.2977448     .042602
+       eb_x_poly3 |   .0166336   .0285677     0.58   0.560     -.039358    .0726252
+           female |  -.0917731   .0048872   -18.78   0.000     -.101352   -.0821943
+          married |   -.005116   .0046983    -1.09   0.276    -.0143245    .0040924
+         austrian |   -.114511   .0065643   -17.44   0.000    -.1273768   -.1016452
+       bluecollar |   .1782813   .0058102    30.68   0.000     .1668935    .1896691
+              age |  -.0916852   .0026637   -34.42   0.000     -.096906   -.0864644
+           age_sq |   .0009904   .0000387    25.58   0.000     .0009145    .0010662
+         log_wage |   1.791059   .1884773     9.50   0.000     1.421651    2.160468
+      log_wage_sq |   -.122068    .013707    -8.91   0.000    -.1489333   -.0952027
+           mo_fe2 |   .0034929   .0103964     0.34   0.737    -.0168837    .0238694
+           mo_fe3 |  -.0785701   .0099305    -7.91   0.000    -.0980335   -.0591068
+           mo_fe4 |  -.0784784   .0103948    -7.55   0.000    -.0988518    -.058105
+           mo_fe5 |  -.1064566   .0103779   -10.26   0.000    -.1267969   -.0861162
+           mo_fe6 |  -.1326965   .0097732   -13.58   0.000    -.1518516   -.1135413
+           mo_fe7 |  -.0982676   .0100975    -9.73   0.000    -.1180584   -.0784768
+           mo_fe8 |  -.1408368   .0103171   -13.65   0.000     -.161058   -.1206157
+           mo_fe9 |  -.1921647   .0098145   -19.58   0.000    -.2114007   -.1729287
+          mo_fe10 |  -.2133104   .0099088   -21.53   0.000    -.2327313   -.1938896
+          mo_fe11 |  -.1855041   .0098963   -18.74   0.000    -.2049005   -.1661077
+          mo_fe12 |  -.0505319   .0091886    -5.50   0.000    -.0685413   -.0325225
+           yr_fe2 |  -.1957995   .0200585    -9.76   0.000    -.2351134   -.1564857
+           yr_fe3 |  -.2163319   .0200934   -10.77   0.000    -.2557142   -.1769496
+           yr_fe4 |  -.1029895   .0196738    -5.23   0.000    -.1415494   -.0644296
+           yr_fe5 |  -.0518975   .0191788    -2.71   0.007    -.0894873   -.0143077
+           yr_fe6 |  -.0345784   .0179033    -1.93   0.053    -.0696683    .0005115
+           yr_fe7 |   .0417397   .0174405     2.39   0.017      .007557    .0759224
+           yr_fe8 |    .149524   .0172783     8.65   0.000     .1156592    .1833888
+           yr_fe9 |   .2565727   .0174118    14.74   0.000     .2224462    .2906992
+          yr_fe10 |   .1783841   .0171782    10.38   0.000     .1447154    .2120528
+          yr_fe11 |   .1949444   .0168703    11.56   0.000     .1618793    .2280095
+          yr_fe12 |   .1799011   .0165915    10.84   0.000     .1473824    .2124198
+          yr_fe13 |   .1442888   .0164753     8.76   0.000     .1119978    .1765799
+          yr_fe14 |   .2422626   .0166637    14.54   0.000     .2096024    .2749229
+          yr_fe15 |   .2067137    .016693    12.38   0.000      .173996    .2394313
+          yr_fe16 |   .1285322   .0167734     7.66   0.000     .0956569    .1614076
+          yr_fe17 |   .1108927   .0169315     6.55   0.000     .0777076    .1440777
+          yr_fe18 |   .1819953   .0169531    10.74   0.000     .1487679    .2152227
+          yr_fe19 |   .3096419   .0173528    17.84   0.000      .275631    .3436528
+          yr_fe20 |   .3688007    .017573    20.99   0.000     .3343583    .4032431
+          yr_fe21 |   .2172405   .0176467    12.31   0.000     .1826536    .2518274
+          dg_size |  -.0000781   4.08e-06   -19.12   0.000    -.0000861   -.0000701
+       experience |  -.0001114   4.45e-06   -25.01   0.000    -.0001201   -.0001026
+    experience_sq |   1.35e-08   5.73e-10    23.48   0.000     1.23e-08    1.46e-08
+    had_prior_job |  -.0564244   .0077214    -7.31   0.000    -.0715581   -.0412906
+  prev_bluecollar |   .0625287    .005483    11.40   0.000     .0517822    .0732751
+      last_recall |  -.1004972   .0060999   -16.48   0.000    -.1124527   -.0885416
+ prev_had_nonedur |  -.0473628   .0055914    -8.47   0.000    -.0583218   -.0364039
+last_noneduration |  -.0001093   4.99e-06   -21.87   0.000     -.000119   -.0000995
+         n_spells |    .063547   .0030678    20.71   0.000     .0575342    .0695597
+   above_basic_ed |   .0624694   .0046141    13.54   0.000      .053426    .0715128
+       iagrmining |  -.0102594   .0174101    -0.59   0.556    -.0443824    .0238637
+        icarsales |  -.0465811   .0112613    -4.14   0.000    -.0686527   -.0245094
+           ihotel |   .0576871   .0079747     7.23   0.000     .0420569    .0733173
+        imanufact |  -.1111901   .0066804   -16.64   0.000    -.1242835   -.0980967
+         iservice |  -.1025887   .0067593   -15.18   0.000    -.1158366   -.0893408
+       itransport |   .0356091   .0100756     3.53   0.000     .0158612     .055357
+       iwholesale |  -.0375428   .0078201    -4.80   0.000    -.0528699   -.0222157
+       region_fe2 |   .2106801   .0061461    34.28   0.000     .1986339    .2227263
+       region_fe3 |   .2626482   .0062345    42.13   0.000     .2504288    .2748677
+       region_fe4 |    .192834    .006063    31.80   0.000     .1809507    .2047173
+       region_fe5 |    .425576   .0079871    53.28   0.000     .4099215    .4412305
+       region_fe6 |   .2662718   .0070832    37.59   0.000     .2523891    .2801546
+-----------------------------------------------------------------------------------
+
+. 
+. *-------------------------------------
+. * Column 4: Basic controls, reweighted
+. *-------------------------------------
+. capture drop censored
+
+. gen censored = no_reemploy|noneduration>=140
+
+. stset noneduration, failure(censored==0)
+
+Survival-time data settings
+
+         Failure event: censored==0
+Observed time interval: (0, noneduration]
+     Exit on or before: failure
+
+--------------------------------------------------------------------------
+    650,922  total observations
+          0  exclusions
+--------------------------------------------------------------------------
+    650,922  observations remaining, representing
+    335,047  failures in single-record/single-failure data
+  341678305  total analysis time at risk and under observation
+                                                At risk from t =         0
+                                     Earliest observed entry t =         0
+                                          Last observed exit t =     8,214
+
+. 
+. eststo col4: stcox sp_eligible eb_eligible `rd_poly' `basic_controls', ///
+>     nohr vce(cluster penr)
+
+        Failure _d: censored==0
+  Analysis time _t: noneduration
+
+Iteration 0:  Log pseudolikelihood = -3798250.7
+Iteration 1:  Log pseudolikelihood = -3779857.2
+Iteration 2:  Log pseudolikelihood = -3779617.5
+Iteration 3:  Log pseudolikelihood = -3779604.8
+Iteration 4:  Log pseudolikelihood = -3779604.8
+Refining estimates:
+Iteration 0:  Log pseudolikelihood = -3779604.8
+
+Cox regression with Breslow method for ties
+
+No. of subjects =   565,835                           Number of obs =  565,835
+No. of failures =   293,818
+Time at risk    = 258213057
+                                                      Wald chi2(53) = 35137.84
+Log pseudolikelihood = -3779604.8                     Prob > chi2   =   0.0000
+
+                             (Std. err. adjusted for 469,713 clusters in penr)
+------------------------------------------------------------------------------
+             |               Robust
+          _t | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ sp_eligible |  -.1148237    .018037    -6.37   0.000    -.1501756   -.0794718
+ eb_eligible |  -.0637399   .0166337    -3.83   0.000    -.0963414   -.0311384
+    sp_poly1 |   .1886705   .0445944     4.23   0.000     .1012672    .2760738
+    sp_poly2 |   .2528399   .0476613     5.30   0.000     .1594254    .3462544
+    sp_poly3 |   .0793197   .0147431     5.38   0.000     .0504237    .1082158
+  sp_x_poly1 |  -.2356191    .079596    -2.96   0.003    -.3916245   -.0796137
+  sp_x_poly2 |  -.2859644    .095073    -3.01   0.003     -.472304   -.0996247
+  sp_x_poly3 |  -.0808695   .0320951    -2.52   0.012    -.1437746   -.0179643
+    eb_poly1 |   .1377838   .0557594     2.47   0.013     .0284974    .2470702
+    eb_poly2 |   .0985705   .0668752     1.47   0.140    -.0325024    .2296435
+    eb_poly3 |   .0316571   .0226003     1.40   0.161    -.0126387    .0759528
+  eb_x_poly1 |  -.0981046   .0713401    -1.38   0.169    -.2379287    .0417195
+  eb_x_poly2 |  -.0632459   .0822421    -0.77   0.442    -.2244376    .0979457
+  eb_x_poly3 |   .0011203   .0269984     0.04   0.967    -.0517955    .0540361
+      female |   -.109004   .0044822   -24.32   0.000    -.1177889   -.1002191
+     married |   .0153067   .0044377     3.45   0.001     .0066089    .0240045
+    austrian |    -.14675    .005847   -25.10   0.000      -.15821     -.13529
+  bluecollar |   .2140662   .0042918    49.88   0.000     .2056544    .2224779
+         age |  -.1339005   .0021965   -60.96   0.000    -.1382055   -.1295954
+      age_sq |   .0015324   .0000323    47.46   0.000     .0014691    .0015956
+    log_wage |     1.9438   .1738067    11.18   0.000     1.603145    2.284455
+ log_wage_sq |  -.1338617   .0126204   -10.61   0.000    -.1585972   -.1091262
+      mo_fe2 |  -.0171861   .0095699    -1.80   0.073    -.0359427    .0015706
+      mo_fe3 |  -.0905732   .0091455    -9.90   0.000     -.108498   -.0726484
+      mo_fe4 |  -.0956399   .0096297    -9.93   0.000    -.1145138    -.076766
+      mo_fe5 |  -.1212596    .009731   -12.46   0.000    -.1403321   -.1021872
+      mo_fe6 |  -.1382078   .0091555   -15.10   0.000    -.1561522   -.1202634
+      mo_fe7 |  -.1106972   .0094791   -11.68   0.000     -.129276   -.0921184
+      mo_fe8 |  -.1536922   .0097021   -15.84   0.000    -.1727079   -.1346765
+      mo_fe9 |  -.1977584    .009204   -21.49   0.000     -.215798   -.1797188
+     mo_fe10 |  -.2240588   .0093177   -24.05   0.000    -.2423211   -.2057965
+     mo_fe11 |  -.2025393   .0092832   -21.82   0.000     -.220734   -.1843447
+     mo_fe12 |  -.0572626   .0084304    -6.79   0.000    -.0737859   -.0407393
+      yr_fe2 |  -.2032204   .0192793   -10.54   0.000    -.2410071   -.1654338
+      yr_fe3 |  -.2101094   .0192728   -10.90   0.000    -.2478834   -.1723355
+      yr_fe4 |  -.1027276   .0188391    -5.45   0.000    -.1396516   -.0658036
+      yr_fe5 |  -.0602402    .018374    -3.28   0.001    -.0962526   -.0242277
+      yr_fe6 |  -.0478269   .0171331    -2.79   0.005    -.0814072   -.0142467
+      yr_fe7 |   .0183971   .0166723     1.10   0.270    -.0142799    .0510741
+      yr_fe8 |   .1363699   .0164975     8.27   0.000     .1040354    .1687045
+      yr_fe9 |   .2486034   .0166126    14.96   0.000     .2160433    .2811636
+     yr_fe10 |   .1820512   .0164101    11.09   0.000      .149888    .2142144
+     yr_fe11 |   .1981555   .0161241    12.29   0.000     .1665528    .2297582
+     yr_fe12 |   .1864877   .0158458    11.77   0.000     .1554304     .217545
+     yr_fe13 |   .1570313   .0157431     9.97   0.000     .1261754    .1878872
+     yr_fe14 |   .2483165   .0159155    15.60   0.000     .2171227    .2795103
+     yr_fe15 |   .2131675   .0159334    13.38   0.000     .1819386    .2443965
+     yr_fe16 |   .1452354   .0160003     9.08   0.000     .1138753    .1765954
+     yr_fe17 |   .1326935   .0161028     8.24   0.000     .1011326    .1642543
+     yr_fe18 |   .1998617   .0161337    12.39   0.000     .1682403    .2314832
+     yr_fe19 |   .3125988   .0165176    18.93   0.000      .280225    .3449727
+     yr_fe20 |   .3676104   .0166845    22.03   0.000     .3349094    .4003113
+     yr_fe21 |   .2304294    .016768    13.74   0.000     .1975648     .263294
+------------------------------------------------------------------------------
+
+. * Reset stset to unweighted for the remaining column
+. stset noneduration, failure(censored == 0)
+
+Survival-time data settings
+
+         Failure event: censored==0
+Observed time interval: (0, noneduration]
+     Exit on or before: failure
+
+--------------------------------------------------------------------------
+    650,922  total observations
+          0  exclusions
+--------------------------------------------------------------------------
+    650,922  observations remaining, representing
+    335,047  failures in single-record/single-failure data
+  341678305  total analysis time at risk and under observation
+                                                At risk from t =         0
+                                     Earliest observed entry t =         0
+                                          Last observed exit t =     8,214
+
+. 
+. *---------------------------------------
+. * Column 5: Basic controls, >= 4 layoffs
+. *-------------------------------------
+. eststo col5: stcox sp_eligible eb_eligible `rd_poly' `basic_controls' ///
+> if multi_layoff == 1, nohr vce(cluster penr)
+
+        Failure _d: censored==0
+  Analysis time _t: noneduration
+
+Iteration 0:  Log pseudolikelihood = -262247.62
+Iteration 1:  Log pseudolikelihood = -261228.15
+Iteration 2:  Log pseudolikelihood = -261226.23
+Iteration 3:  Log pseudolikelihood = -261226.23
+Refining estimates:
+Iteration 0:  Log pseudolikelihood = -261226.23
+
+Cox regression with Breslow method for ties
+
+No. of subjects =     48,390                           Number of obs =  48,390
+No. of failures =     25,049
+Time at risk    = 19,931,311
+                                                       Wald chi2(53) = 2028.04
+Log pseudolikelihood = -261226.23                      Prob > chi2   =  0.0000
+
+                              (Std. err. adjusted for 47,119 clusters in penr)
+------------------------------------------------------------------------------
+             |               Robust
+          _t | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ sp_eligible |  -.1317205   .0580374    -2.27   0.023    -.2454716   -.0179693
+ eb_eligible |  -.0786204   .0582791    -1.35   0.177    -.1928453    .0356044
+    sp_poly1 |   .1249653   .1511432     0.83   0.408      -.17127    .4212006
+    sp_poly2 |   .1499572   .1640515     0.91   0.361    -.1715777    .4714922
+    sp_poly3 |   .0369027   .0513805     0.72   0.473    -.0638012    .1376066
+  sp_x_poly1 |   .1072081    .255021     0.42   0.674    -.3926238    .6070401
+  sp_x_poly2 |   -.481716   .3025129    -1.59   0.111     -1.07463    .1111984
+  sp_x_poly3 |   .0655231   .1011491     0.65   0.517    -.1327255    .2637718
+    eb_poly1 |   .1594941    .198406     0.80   0.421    -.2293744    .5483627
+    eb_poly2 |   .2226389   .2388279     0.93   0.351    -.2454551    .6907329
+    eb_poly3 |    .113884    .080959     1.41   0.160    -.0447927    .2725606
+  eb_x_poly1 |  -.1070896   .2491957    -0.43   0.667    -.5955043     .381325
+  eb_x_poly2 |  -.1904746   .2878989    -0.66   0.508     -.754746    .3737968
+  eb_x_poly3 |  -.0940237   .0946673    -0.99   0.321    -.2795682    .0915208
+      female |   -.194585   .0154113   -12.63   0.000    -.2247907   -.1643794
+     married |   .0362944   .0149744     2.42   0.015     .0069451    .0656437
+    austrian |  -.1108162   .0177186    -6.25   0.000     -.145544   -.0760885
+  bluecollar |   .1092461   .0149625     7.30   0.000     .0799203     .138572
+         age |    -.10518   .0074119   -14.19   0.000    -.1197071   -.0906529
+      age_sq |   .0012523   .0001097    11.42   0.000     .0010374    .0014672
+    log_wage |  -.0413091   .0837769    -0.49   0.622    -.2055088    .1228906
+ log_wage_sq |  -.0000527   .0063598    -0.01   0.993    -.0125177    .0124124
+      mo_fe2 |  -.0734802   .0339246    -2.17   0.030    -.1399712   -.0069892
+      mo_fe3 |  -.1417034   .0320031    -4.43   0.000    -.2044283   -.0789784
+      mo_fe4 |  -.1545545   .0344288    -4.49   0.000    -.2220336   -.0870753
+      mo_fe5 |  -.1985322   .0351148    -5.65   0.000    -.2673559   -.1297085
+      mo_fe6 |   -.166254   .0329032    -5.05   0.000    -.2307431   -.1017648
+      mo_fe7 |  -.1893909   .0342429    -5.53   0.000    -.2565057   -.1222761
+      mo_fe8 |  -.2975111   .0350225    -8.49   0.000    -.3661538   -.2288683
+      mo_fe9 |  -.2673031   .0328806    -8.13   0.000    -.3317478   -.2028583
+     mo_fe10 |  -.3485046   .0333569   -10.45   0.000    -.4138829   -.2831263
+     mo_fe11 |   -.357858   .0331685   -10.79   0.000    -.4228672   -.2928489
+     mo_fe12 |  -.1008199   .0294637    -3.42   0.001    -.1585677   -.0430722
+      yr_fe2 |  -.3269193   .0572353    -5.71   0.000    -.4390985   -.2147401
+      yr_fe3 |  -.2698932   .0622099    -4.34   0.000    -.3918224   -.1479641
+      yr_fe4 |  -.1032791   .0633662    -1.63   0.103    -.2274746    .0209164
+      yr_fe5 |  -.0812821   .0618959    -1.31   0.189    -.2025959    .0400317
+      yr_fe6 |  -.0866596   .0514078    -1.69   0.092     -.187417    .0140978
+      yr_fe7 |  -.0753218   .0495688    -1.52   0.129    -.1724748    .0218313
+      yr_fe8 |   .0394294   .0505614     0.78   0.435    -.0596691    .1385279
+      yr_fe9 |   .1877935   .0537391     3.49   0.000     .0824668    .2931201
+     yr_fe10 |   .1379504   .0512944     2.69   0.007     .0374151    .2384856
+     yr_fe11 |   .1656658   .0487634     3.40   0.001     .0700912    .2612404
+     yr_fe12 |   .1364081    .046454     2.94   0.003       .04536    .2274562
+     yr_fe13 |   .0360301   .0460256     0.78   0.434    -.0541783    .1262385
+     yr_fe14 |   .0992082   .0495229     2.00   0.045     .0021451    .1962713
+     yr_fe15 |   .1029893   .0481018     2.14   0.032     .0087114    .1972672
+     yr_fe16 |  -.0172802   .0479988    -0.36   0.719     -.111356    .0767957
+     yr_fe17 |    .123502   .0490315     2.52   0.012      .027402    .2196021
+     yr_fe18 |    .150631   .0485174     3.10   0.002     .0555387    .2457234
+     yr_fe19 |    .181067   .0504997     3.59   0.000     .0820895    .2800446
+     yr_fe20 |   .2977776   .0518623     5.74   0.000     .1961293    .3994259
+     yr_fe21 |   .0862154    .049059     1.76   0.079    -.0099384    .1823692
+------------------------------------------------------------------------------
+
+. 
+.         
+. *--------------
+. * Export Table
+. *--------------
+. 
+. * Install esttab if not already available
+. capture which esttab
+
+. if _rc != 0 {
+.     ssc install estout, replace
+. }
+
+. esttab col1 col2 col3 col4 col5 ///
+>     using "$output/tables/table2_hazard.tex", ///
+>     replace ///
+>     label ///
+>     keep(sp_eligible eb_eligible) ///
+>     order(sp_eligible eb_eligible) ///
+>     b(%9.3f) se(%9.3f) ///
+>     star(* 0.10 ** 0.05 *** 0.01) ///
+>     title("Effects of Severance Pay and EB on Nonemployment Durations: Hazard Model Estimates
+> ") ///
+>     mtitles("No controls" "Basic controls" "Full controls" "Reweighted" "$\geq$4 layoffs") //
+> /
+>     scalars("N Observations") ///
+>     nonotes ///
+>     addnotes( ///
+>         "Cox hazard model estimates (log-hazard coefficients). Nonemployment durations" ///
+>         "censored at 20 weeks (140 days). All columns include cubic polynomials in job" ///
+>         "tenure and months worked, interacted with SP and EB indicators. Standard errors" ///
+>         "clustered by individual in parentheses." ///
+>         "* p<0.10, ** p<0.05, *** p<0.01" ///
+>     ) ///
+>     booktabs
+(file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/tables/table2_hazard.tex not found)
+(output written to C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/tables/table2_hazard.tex
+> )
+
+. 
+. * Also export a CSV version for convenience
+. esttab col1 col2 col3 col4 col5 ///
+>     using "$output/tables/table2_hazard.csv", ///
+>     replace ///
+>     label ///
+>     keep(sp_eligible eb_eligible) ///
+>     order(sp_eligible eb_eligible) ///
+>     b(%9.4f) se(%9.4f) ///
+>     star(* 0.10 ** 0.05 *** 0.01) ///
+>     mtitles("No controls" "Basic controls" "Full controls" "Reweighted" ">=4 layoffs")
+(file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/tables/table2_hazard.csv not found)
+(output written to C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/tables/table2_hazard.csv
+> )
+
+. 
+. 
+. *----------------------
+. * Display results in log
+. *-----------------------
+. 
+. display _newline(2) "=== Table II: Summary of key coefficients ==="
+
+
+=== Table II: Summary of key coefficients ===
+
+. esttab col1 col2 col3 col4 col5, ///
+>     keep(sp_eligible eb_eligible) ///
+>     order(sp_eligible eb_eligible) ///
+>     b(%9.4f) se(%9.4f) ///
+>     star(* 0.10 ** 0.05 *** 0.01) ///
+>     mtitles("No controls" "Basic controls" "Full controls" "Reweighted" ">=4 layoffs") ///
+>     scalars("N Observations") ///
+>     title("Table II — Card, Chetty & Weber (2007) Replication")
+
+Table II — Card, Chetty & Weber (2007) Replication
+--------------------------------------------------------------------------------------------
+                      (1)             (2)             (3)             (4)             (5)   
+              No controls    Basic cont~s    Full contr~s      Reweighted     >=4 layoffs   
+--------------------------------------------------------------------------------------------
+sp_eligible       -0.1249***      -0.1148***      -0.0943***      -0.1148***      -0.1317** 
+                 (0.0168)        (0.0180)        (0.0191)        (0.0180)        (0.0580)   
+
+eb_eligible       -0.0935***      -0.0637***      -0.0664***      -0.0637***      -0.0786   
+                 (0.0156)        (0.0166)        (0.0175)        (0.0166)        (0.0583)   
+--------------------------------------------------------------------------------------------
+N                  650922          565835          509355          565835           48390   
+--------------------------------------------------------------------------------------------
+Standard errors in parentheses
+* p<0.10, ** p<0.05, *** p<0.01
+
+. 
+. 
+. 
+. eststo clear
+
+. log close
+      name:  <unnamed>
+       log:  C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/logs/03_tables.log
+  log type:  text
+ closed on:  15 Mar 2026, 01:34:14
+-----------------------------------------------------------------------------------------------

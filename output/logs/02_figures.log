@@ -1,0 +1,1216 @@
+-----------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/logs/02_figures.log
+  log type:  text
+ opened on:  15 Mar 2026, 01:27:22
+
+. use "$clean/analysis_dataset.dta", clear
+
+. 
+. *------------------
+. * Global parameters
+. *------------------
+. 
+. * 31-day "month" for bucketing the running variable into bins
+. global bin_width = 31
+
+. * UI censoring threshold: 20 weeks = 140 days (for survival analysis)
+. global cens_threshold = 140
+
+. 
+. * ----------
+. * Figure II
+. * ----------
+. 
+. bysort bin_sp: gen freq_sp = _N
+
+. bysort bin_sp: gen idx_freq = _n
+
+. twoway scatter freq_sp bin_sp if idx_freq == 1, ///
+>     connect(l) msize(medsmall) ///
+>     xlabel(12(6)60) xline(35.5) ///
+>     graphregion(fcolor(white)) legend(off) ///
+>     title(Figure II) ///
+>     subtitle(Frequency of Layoffs by Job Tenure) ///
+>     xtitle(Previous Job Tenure (Months)) ///
+>     ytitle(Number of Layoffs)
+
+. graph export "$output/figures/figII.png", replace
+(file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figII.png not found)
+file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figII.png saved as PNG
+    format
+
+. drop freq_sp idx_freq
+
+. 
+. * ------------
+. * Figure IIIa
+. * ------------
+. 
+. capture drop num_jobs mean_numjobs_sp idx_numjobs
+
+. gen num_jobs = last_breaks + 1
+
+. bysort bin_sp: egen mean_numjobs_sp = mean(num_jobs)
+
+. gen temp = (num_jobs == .)
+
+. bysort bin_sp temp: gen idx_numjobs = _n if num_jobs != .
+
+. drop temp
+
+. 
+. twoway ///
+>     scatter mean_numjobs_sp bin_sp if idx_numjobs == 1, ///
+>         msize(medsmall) xlabel(12(6)60) xline(35.5) ///
+>         graphregion(fcolor(white)) legend(off) ///
+>     || lfit mean_numjobs_sp bin_sp ///
+>         if idx_numjobs == 1 & bin_sp < 35.5 ///
+>     || lfit mean_numjobs_sp bin_sp ///
+>         if idx_numjobs == 1 & bin_sp > 35.5, ///
+>     title(Figure IIIa) ///
+>     subtitle(Number of Jobs Held by Job Tenure) ///
+>     xtitle(Previous Job Tenure (Months)) ///
+>     ytitle(Mean Number of Jobs)
+
+. graph export "$output/figures/figIIIa.png", replace
+(file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figIIIa.png not found)
+file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figIIIa.png saved as PNG
+    format
+
+. drop mean_numjobs_sp idx_numjobs num_jobs
+
+. 
+. * -----------
+. * Figure IIIb
+. * -----------
+. 
+. bysort bin_sp: egen mean_wage_sp = mean(annual_wage)
+
+. gen temp = (wage0 == .)
+
+. bysort bin_sp temp: gen idx_wage = _n if wage0 != .
+(9,307 missing values generated)
+
+. drop temp
+
+. 
+. twoway ///
+>     scatter mean_wage_sp bin_sp if idx_wage == 1, ///
+>         msize(medsmall) xlabel(12(6)60) xline(35.5) ///
+>         graphregion(fcolor(white)) legend(off) ///
+>     || lfit mean_wage_sp bin_sp ///
+>         if idx_wage == 1 & bin_sp < 35.5 ///
+>     || lfit mean_wage_sp bin_sp ///
+>         if idx_wage == 1 & bin_sp > 35.5, ///
+>     title(Figure IIIb) ///
+>     subtitle(Wage by Job Tenure) ///
+>     xtitle(Previous Job Tenure (Months)) ///
+>     ytitle(Mean Annual Wage)
+
+. graph export "$output/figures/figIIIb.png", replace
+(file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figIIIb.png not found)
+file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figIIIb.png saved as PNG
+    format
+
+. drop mean_wage_sp idx_wage
+
+. 
+. 
+. * ---------
+. * Figure IV
+. * ---------
+. 
+. capture drop censored
+
+. gen censored = no_reemploy | noneduration >= $cens_threshold
+
+. stset noneduration, failure(censored == 0)
+
+Survival-time data settings
+
+         Failure event: censored==0
+Observed time interval: (0, noneduration]
+     Exit on or before: failure
+
+--------------------------------------------------------------------------
+    650,922  total observations
+          0  exclusions
+--------------------------------------------------------------------------
+    650,922  observations remaining, representing
+    335,047  failures in single-record/single-failure data
+  341678305  total analysis time at risk and under observation
+                                                At risk from t =         0
+                                     Earliest observed entry t =         0
+                                          Last observed exit t =     8,214
+
+. 
+. * Demean covariates (authors' approach) so intercept does not drive results
+. capture drop mean_* demean_*
+
+. foreach X of varlist female bluecollar austrian age age_sq above_basic_ed married ///
+>                       experience experience_sq log_wage log_wage_sq firms               ///
+>                       prev_bluecollar prev_had_nonedur {
+  2.     capture egen mean_`X'   = mean(`X')
+  3.     capture gen  demean_`X' = `X' - mean_`X'
+  4. }
+
+. 
+. stcox demean_female demean_bluecollar demean_austrian        ///
+>       demean_age demean_age_sq demean_above_basic_ed demean_married   ///
+>       demean_experience demean_experience_sq                        ///
+>       demean_log_wage demean_log_wage_sq demean_firms                ///
+>       demean_prev_bluecollar demean_prev_had_nonedur               ///
+>       region_fe* yr_fe* mo_fe*, nohr
+
+        Failure _d: censored==0
+  Analysis time _t: noneduration
+
+note: region_fe6 omitted because of collinearity.
+note: yr_fe21 omitted because of collinearity.
+note: mo_fe12 omitted because of collinearity.
+Iteration 0:  Log likelihood = -3404215.9
+Iteration 1:  Log likelihood = -3387005.7
+Iteration 2:  Log likelihood = -3386734.2
+Iteration 3:  Log likelihood = -3386723.2
+Iteration 4:  Log likelihood = -3386723.2
+Refining estimates:
+Iteration 0:  Log likelihood = -3386723.2
+
+Cox regression with Breslow method for ties
+
+No. of subjects =   509,355                           Number of obs =  509,355
+No. of failures =   265,530
+Time at risk    = 230122875
+                                                      LR chi2(49)   = 34985.47
+Log likelihood = -3386723.2                           Prob > chi2   =   0.0000
+
+-----------------------------------------------------------------------------------------
+                     _t | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+------------------------+----------------------------------------------------------------
+          demean_female |   -.100478    .004628   -21.71   0.000    -.1095488   -.0914072
+      demean_bluecollar |    .182025    .005319    34.22   0.000     .1716001      .19245
+        demean_austrian |  -.1725107   .0064301   -26.83   0.000    -.1851135   -.1599078
+             demean_age |  -.1043471   .0025839   -40.38   0.000    -.1094114   -.0992828
+          demean_age_sq |   .0010809    .000038    28.44   0.000     .0010064    .0011554
+  demean_above_basic_ed |   .0569121   .0045291    12.57   0.000     .0480352    .0657889
+         demean_married |   .0031761   .0046339     0.69   0.493    -.0059062    .0122583
+      demean_experience |    .000021   3.79e-06     5.53   0.000     .0000135    .0000284
+   demean_experience_sq |   2.13e-09   5.38e-10     3.96   0.000     1.08e-09    3.18e-09
+        demean_log_wage |   1.803885   .0800013    22.55   0.000     1.647085    1.960685
+     demean_log_wage_sq |  -.1179806   .0058301   -20.24   0.000    -.1294074   -.1065539
+           demean_firms |  -.0002604   7.23e-06   -36.03   0.000    -.0002746   -.0002462
+ demean_prev_bluecollar |   .0745395   .0052802    14.12   0.000     .0641906    .0848884
+demean_prev_had_nonedur |  -.1283165   .0050132   -25.60   0.000    -.1381422   -.1184908
+             region_fe1 |  -.2476237   .0069845   -35.45   0.000    -.2613131   -.2339343
+             region_fe2 |  -.0477205   .0074508    -6.40   0.000    -.0623238   -.0331173
+             region_fe3 |  -.0065204   .0074754    -0.87   0.383     -.021172    .0081312
+             region_fe4 |  -.0741189   .0073367   -10.10   0.000    -.0884986   -.0597392
+             region_fe5 |   .1728505   .0089532    19.31   0.000     .1553025    .1903985
+             region_fe6 |          0  (omitted)
+                 yr_fe1 |  -.1364047   .0178072    -7.66   0.000    -.1713061   -.1015033
+                 yr_fe2 |  -.3472399   .0169086   -20.54   0.000    -.3803801   -.3140998
+                 yr_fe3 |  -.3686593    .016965   -21.73   0.000      -.40191   -.3354085
+                 yr_fe4 |   -.271604   .0164174   -16.54   0.000    -.3037815   -.2394265
+                 yr_fe5 |  -.2306104   .0157059   -14.68   0.000    -.2613934   -.1998275
+                 yr_fe6 |  -.2367713    .013839   -17.11   0.000    -.2638952   -.2096474
+                 yr_fe7 |  -.1619402   .0131054   -12.36   0.000    -.1876263    -.136254
+                 yr_fe8 |  -.0524549   .0128329    -4.09   0.000     -.077607   -.0273028
+                 yr_fe9 |   .0551235   .0128475     4.29   0.000     .0299429    .0803041
+                yr_fe10 |  -.0230332   .0125178    -1.84   0.066    -.0475676    .0015011
+                yr_fe11 |  -.0063363   .0120823    -0.52   0.600    -.0300172    .0173446
+                yr_fe12 |   -.023195   .0116659    -1.99   0.047    -.0460598   -.0003302
+                yr_fe13 |  -.0555056   .0114667    -4.84   0.000    -.0779799   -.0330314
+                yr_fe14 |   .0441058     .01168     3.78   0.000     .0212134    .0669983
+                yr_fe15 |   .0096051   .0116924     0.82   0.411    -.0133116    .0325219
+                yr_fe16 |  -.0690099   .0118043    -5.85   0.000    -.0921459   -.0458739
+                yr_fe17 |  -.0908292   .0119905    -7.58   0.000      -.11433   -.0673283
+                yr_fe18 |  -.0271819   .0119217    -2.28   0.023    -.0505481   -.0038157
+                yr_fe19 |    .102178   .0123408     8.28   0.000     .0779906    .1263654
+                yr_fe20 |   .1475814   .0125126    11.79   0.000     .1230571    .1721057
+                yr_fe21 |          0  (omitted)
+                 mo_fe1 |   .0605329   .0093583     6.47   0.000      .042191    .0788747
+                 mo_fe2 |   .0660974   .0092396     7.15   0.000     .0479882    .0842067
+                 mo_fe3 |  -.0182362   .0086239    -2.11   0.034    -.0351387   -.0013337
+                 mo_fe4 |  -.0183059   .0091491    -2.00   0.045    -.0362379   -.0003739
+                 mo_fe5 |  -.0443038   .0092471    -4.79   0.000    -.0624277   -.0261799
+                 mo_fe6 |  -.0756089   .0085977    -8.79   0.000      -.09246   -.0587578
+                 mo_fe7 |  -.0408921   .0088604    -4.62   0.000    -.0582581    -.023526
+                 mo_fe8 |  -.0844988   .0088741    -9.52   0.000    -.1018917   -.0671058
+                 mo_fe9 |  -.1401729    .008452   -16.58   0.000    -.1567385   -.1236073
+                mo_fe10 |  -.1566313   .0086979   -18.01   0.000    -.1736789   -.1395838
+                mo_fe11 |  -.1306435    .008789   -14.86   0.000    -.1478697   -.1134173
+                mo_fe12 |          0  (omitted)
+-----------------------------------------------------------------------------------------
+
+. predict predicted_hr
+(option hr assumed; predicted hazard ratio)
+(141,567 missing values generated)
+
+. 
+. bysort bin_sp: egen avg_pred_hazard = mean(predicted_hr)
+
+. gen temp = (avg_pred_hazard == .)
+
+. bysort bin_sp temp: gen idx_pred = _n if avg_pred_hazard != .
+
+. drop temp
+
+. 
+. twoway ///
+>     scatter avg_pred_hazard bin_sp if idx_pred == 1, ///
+>         msize(medsmall) xlabel(12(6)60) xline(35.5) ///
+>         graphregion(fcolor(white)) legend(off) ///
+>     || lfit avg_pred_hazard bin_sp if bin_sp < 35.5 & idx_pred == 1 ///
+>     || lfit avg_pred_hazard bin_sp if bin_sp > 35.5 & idx_pred == 1, ///
+>     title(Figure IV) ///
+>     subtitle(Selection on Observables) ///
+>     xtitle(Previous Job Tenure (Months)) ///
+>     ytitle(Mean Predicted Hazard Ratios)
+
+. graph export "$output/figures/figIV.png", replace
+(file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figIV.png not found)
+file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figIV.png saved as PNG
+    format
+
+. drop predicted_hr avg_pred_hazard idx_pred demean_*                          ///
+>      mean_female mean_bluecollar mean_austrian mean_age mean_age_sq    ///
+>      mean_above_basic_ed mean_married mean_experience mean_experience_sq           ///
+>      mean_log_wage mean_log_wage_sq mean_firms mean_prev_bluecollar mean_prev_had_nonedur
+
+. 
+. 
+. * --------
+. * Figure V
+. * --------
+. 
+. capture drop dur_under_2yr
+
+. gen dur_under_2yr = (noneduration <= 2*365)
+
+. 
+. capture drop avg_nonedur idx_cat
+
+. bysort bin_sp dur_under_2yr: gen idx_cat = _n if dur_under_2yr == 1
+(95,469 missing values generated)
+
+. bysort bin_sp: egen avg_nonedur = mean(noneduration) if dur_under_2yr == 1
+(95,469 missing values generated)
+
+. replace avg_nonedur = . if inlist(bin_sp, 12, 59)
+(0 real changes made)
+
+. 
+. twoway ///
+>     scatter avg_nonedur bin_sp if idx_cat == 1, ///
+>         msize(medsmall) xlabel(12(6)60) xline(35.5) ///
+>         graphregion(fcolor(white)) legend(off) ///
+>         yscale(range(142.5 167.5)) ylabel(145(5)165) ///
+>     || qfit avg_nonedur bin_sp ///
+>         if idx_cat == 1 & bin_sp < 35.5 ///
+>     || qfit avg_nonedur bin_sp ///
+>         if idx_cat == 1 & bin_sp > 35.5, ///
+>     title(Figure V) ///
+>     subtitle(Effect of Severance Pay on Nonemployment Durations) ///
+>     xtitle(Previous Job Tenure (Months)) ///
+>     ytitle(Mean Nonemployment Duration (Days))
+
+. graph export "$output/figures/figV.png", replace
+(file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figV.png not found)
+file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figV.png saved as PNG format
+
+. drop avg_nonedur idx_cat
+
+. 
+. * ----------
+. * Figure VI
+. * ----------
+. 
+. capture drop censored
+
+. gen censored = no_reemploy | noneduration >= $cens_threshold
+
+. stset noneduration, failure(censored == 0)
+
+Survival-time data settings
+
+         Failure event: censored==0
+Observed time interval: (0, noneduration]
+     Exit on or before: failure
+
+--------------------------------------------------------------------------
+    650,922  total observations
+          0  exclusions
+--------------------------------------------------------------------------
+    650,922  observations remaining, representing
+    335,047  failures in single-record/single-failure data
+  341678305  total analysis time at risk and under observation
+                                                At risk from t =         0
+                                     Earliest observed entry t =         0
+                                          Last observed exit t =     8,214
+
+. 
+. capture drop bin_dum*
+
+. tabulate bin_sp, gen(bin_dum)
+
+ Monthly SP |
+ tenure bin |
+   (35=just |
+      below |
+    cutoff, |
+    36=just |
+     above) |      Freq.     Percent        Cum.
+------------+-----------------------------------
+         13 |     40,944        6.55        6.55
+         14 |     38,052        6.09       12.64
+         15 |     36,783        5.88       18.52
+         16 |     33,780        5.40       23.92
+         17 |     31,229        5.00       28.92
+         18 |     30,555        4.89       33.81
+         19 |     26,474        4.23       38.04
+         20 |     25,311        4.05       42.09
+         21 |     24,041        3.85       45.94
+         22 |     22,228        3.56       49.49
+         23 |     20,388        3.26       52.75
+         24 |     19,965        3.19       55.95
+         25 |     15,978        2.56       58.50
+         26 |     14,732        2.36       60.86
+         27 |     14,836        2.37       63.23
+         28 |     14,002        2.24       65.47
+         29 |     13,534        2.16       67.64
+         30 |     12,616        2.02       69.66
+         31 |     12,055        1.93       71.58
+         32 |     11,702        1.87       73.46
+         33 |     10,854        1.74       75.19
+         34 |     10,673        1.71       76.90
+         35 |     10,974        1.76       78.66
+         36 |      9,824        1.57       80.23
+         37 |      8,210        1.31       81.54
+         38 |      7,989        1.28       82.82
+         39 |      8,080        1.29       84.11
+         40 |      7,394        1.18       85.29
+         41 |      7,067        1.13       86.42
+         42 |      6,787        1.09       87.51
+         43 |      6,524        1.04       88.55
+         44 |      6,517        1.04       89.60
+         45 |      6,051        0.97       90.56
+         46 |      5,853        0.94       91.50
+         47 |      6,115        0.98       92.48
+         48 |      4,857        0.78       93.26
+         49 |      4,669        0.75       94.00
+         50 |      4,681        0.75       94.75
+         51 |      4,639        0.74       95.49
+         52 |      4,438        0.71       96.20
+         53 |      4,407        0.70       96.91
+         54 |      3,997        0.64       97.55
+         55 |      4,039        0.65       98.19
+         56 |      3,924        0.63       98.82
+         57 |      3,808        0.61       99.43
+         58 |      3,560        0.57      100.00
+------------+-----------------------------------
+      Total |    625,136      100.00
+
+. capture drop idx_hazreg avg_hazard
+
+. 
+. stcox bin_dum1-bin_dum22 bin_dum24-bin_dum46 ///
+>     eb_eligible eb_poly1-eb_poly3 eb_x_poly1-eb_x_poly3 ///
+>     female bluecollar austrian age age_sq log_wage log_wage_sq ///
+>     mo_fe2-mo_fe12 yr_fe2-yr_fe21 married ///
+>     if bin_sp != ., nohr
+
+        Failure _d: censored==0
+  Analysis time _t: noneduration
+
+Iteration 0:  Log likelihood = -3638167.4
+Iteration 1:  Log likelihood =   -3620528
+Iteration 2:  Log likelihood = -3620299.4
+Iteration 3:  Log likelihood = -3620287.1
+Iteration 4:  Log likelihood = -3620287.1
+Refining estimates:
+Iteration 0:  Log likelihood = -3620287.1
+
+Cox regression with Breslow method for ties
+
+No. of subjects =   543,483                           Number of obs =  543,483
+No. of failures =   282,318
+Time at risk    = 247977392
+                                                      LR chi2(91)   = 35760.60
+Log likelihood = -3620287.1                           Prob > chi2   =   0.0000
+
+------------------------------------------------------------------------------
+          _t | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    bin_dum1 |   .0297124   .0163189     1.82   0.069     -.002272    .0616968
+    bin_dum2 |   .0298879   .0163068     1.83   0.067    -.0020727    .0618486
+    bin_dum3 |   .0263413   .0162972     1.62   0.106    -.0056007    .0582832
+    bin_dum4 |   .0370701   .0164244     2.26   0.024     .0048788    .0692613
+    bin_dum5 |   .0159969   .0165913     0.96   0.335    -.0165215    .0485152
+    bin_dum6 |   .0076465   .0166574     0.46   0.646    -.0250013    .0402944
+    bin_dum7 |   .0197201   .0169632     1.16   0.245    -.0135272    .0529674
+    bin_dum8 |     .03082   .0170207     1.81   0.070    -.0025399    .0641798
+    bin_dum9 |    .022573    .017177     1.31   0.189    -.0110933    .0562392
+   bin_dum10 |   .0515292   .0173409     2.97   0.003     .0175418    .0855167
+   bin_dum11 |   .0412755   .0176176     2.34   0.019     .0067457    .0758054
+   bin_dum12 |   .0024985   .0178572     0.14   0.889    -.0325009    .0374978
+   bin_dum13 |  -.0182765   .0186301    -0.98   0.327    -.0547908    .0182379
+   bin_dum14 |  -.0457122   .0189939    -2.41   0.016    -.0829396   -.0084847
+   bin_dum15 |  -.0375637   .0189059    -1.99   0.047    -.0746187   -.0005088
+   bin_dum16 |  -.0378118   .0191513    -1.97   0.048    -.0753477    -.000276
+   bin_dum17 |  -.0414672   .0192931    -2.15   0.032     -.079281   -.0036535
+   bin_dum18 |  -.0198991   .0195796    -1.02   0.309    -.0582745    .0184763
+   bin_dum19 |  -.0230139   .0196752    -1.17   0.242    -.0615765    .0155488
+   bin_dum20 |  -.0495016   .0198712    -2.49   0.013    -.0884485   -.0105547
+   bin_dum21 |   .0137572   .0199965     0.69   0.491    -.0254353    .0529497
+   bin_dum22 |   .0031116   .0200959     0.15   0.877    -.0362758    .0424989
+   bin_dum24 |   -.081469   .0212584    -3.83   0.000    -.1231348   -.0398033
+   bin_dum25 |  -.1451153   .0224045    -6.48   0.000    -.1890273   -.1012033
+   bin_dum26 |  -.0974477   .0222823    -4.37   0.000    -.1411203   -.0537751
+   bin_dum27 |  -.0978621   .0222426    -4.40   0.000    -.1414569   -.0542674
+   bin_dum28 |  -.1498275   .0230063    -6.51   0.000     -.194919    -.104736
+   bin_dum29 |  -.1411817   .0232764    -6.07   0.000    -.1868026   -.0955608
+   bin_dum30 |  -.1321748   .0235313    -5.62   0.000    -.1782952   -.0860543
+   bin_dum31 |  -.1659649   .0237928    -6.98   0.000    -.2125979   -.1193319
+   bin_dum32 |   -.147504   .0238234    -6.19   0.000     -.194197   -.1008109
+   bin_dum33 |  -.1585884   .0243881    -6.50   0.000    -.2063882   -.1107887
+   bin_dum34 |  -.1521283   .0246937    -6.16   0.000    -.2005269   -.1037296
+   bin_dum35 |  -.1558634   .0245565    -6.35   0.000    -.2039931   -.1077336
+   bin_dum36 |  -.1649098   .0264865    -6.23   0.000    -.2168224   -.1129972
+   bin_dum37 |  -.1639208   .0267083    -6.14   0.000    -.2162681   -.1115735
+   bin_dum38 |  -.2487181   .0271238    -9.17   0.000    -.3018797   -.1955565
+   bin_dum39 |  -.2163268   .0270881    -7.99   0.000    -.2694184   -.1632352
+   bin_dum40 |  -.2208442   .0274497    -8.05   0.000    -.2746446   -.1670439
+   bin_dum41 |  -.2537455   .0276925    -9.16   0.000    -.3080218   -.1994691
+   bin_dum42 |  -.3183031   .0289481   -11.00   0.000    -.3750403   -.2615658
+   bin_dum43 |   -.267307   .0284104    -9.41   0.000    -.3229904   -.2116236
+   bin_dum44 |  -.3281768   .0290248   -11.31   0.000    -.3850644   -.2712892
+   bin_dum45 |  -.2744404   .0288317    -9.52   0.000    -.3309494   -.2179314
+   bin_dum46 |  -.3151885   .0300168   -10.50   0.000    -.3740202   -.2563567
+ eb_eligible |  -.0586898   .0171023    -3.43   0.001    -.0922097   -.0251699
+    eb_poly1 |   .1004024   .0592302     1.70   0.090    -.0156866    .2164914
+    eb_poly2 |   .0372379   .0729866     0.51   0.610    -.1058132     .180289
+    eb_poly3 |   .0060261   .0253157     0.24   0.812    -.0435918    .0556441
+  eb_x_poly1 |  -.0657078   .0745462    -0.88   0.378    -.2118157    .0804001
+  eb_x_poly2 |  -.0037697   .0876811    -0.04   0.966    -.1756214    .1680821
+  eb_x_poly3 |   .0284773   .0293968     0.97   0.333    -.0291393    .0860939
+      female |  -.1074298   .0044273   -24.27   0.000    -.1161072   -.0987524
+  bluecollar |   .2132346   .0042436    50.25   0.000     .2049173    .2215519
+    austrian |  -.1458932   .0058462   -24.96   0.000    -.1573515   -.1344348
+         age |  -.1337667   .0022165   -60.35   0.000    -.1381109   -.1294225
+      age_sq |   .0015306   .0000329    46.59   0.000     .0014662     .001595
+    log_wage |   1.925217   .0759217    25.36   0.000     1.776413    2.074021
+ log_wage_sq |  -.1326483    .005534   -23.97   0.000    -.1434947    -.121802
+      mo_fe2 |  -.0176199   .0098726    -1.78   0.074      -.03697    .0017301
+      mo_fe3 |   -.093521   .0093865    -9.96   0.000    -.1119182   -.0751238
+      mo_fe4 |  -.0982003   .0098642    -9.96   0.000    -.1175338   -.0788667
+      mo_fe5 |  -.1232188   .0100693   -12.24   0.000    -.1429542   -.1034834
+      mo_fe6 |  -.1394248   .0095301   -14.63   0.000    -.1581035    -.120746
+      mo_fe7 |  -.1130967    .009737   -11.62   0.000    -.1321808   -.0940126
+      mo_fe8 |  -.1551377   .0097581   -15.90   0.000    -.1742632   -.1360122
+      mo_fe9 |  -.2006593   .0094188   -21.30   0.000    -.2191197   -.1821988
+     mo_fe10 |  -.2240829   .0096216   -23.29   0.000    -.2429409   -.2052248
+     mo_fe11 |  -.2055583   .0096896   -21.21   0.000    -.2245494   -.1865671
+     mo_fe12 |  -.0573607   .0087761    -6.54   0.000    -.0745616   -.0401598
+      yr_fe2 |  -.2043608   .0200491   -10.19   0.000    -.2436565   -.1650652
+      yr_fe3 |  -.2148834   .0201034   -10.69   0.000    -.2542854   -.1754814
+      yr_fe4 |  -.1081285   .0197564    -5.47   0.000    -.1468504   -.0694067
+      yr_fe5 |  -.0618426   .0191643    -3.23   0.001     -.099404   -.0242813
+      yr_fe6 |  -.0509551   .0177446    -2.87   0.004     -.085734   -.0161763
+      yr_fe7 |   .0130624   .0172572     0.76   0.449    -.0207612    .0468859
+      yr_fe8 |   .1387413   .0170904     8.12   0.000     .1052448    .1722379
+      yr_fe9 |   .2508607   .0170955    14.67   0.000     .2173541    .2843672
+     yr_fe10 |   .1796264   .0168998    10.63   0.000     .1465034    .2127493
+     yr_fe11 |   .1953234   .0166373    11.74   0.000     .1627149    .2279318
+     yr_fe12 |   .1842812   .0163908    11.24   0.000     .1521558    .2164067
+     yr_fe13 |   .1524262    .016279     9.36   0.000     .1205199    .1843325
+     yr_fe14 |   .2449974   .0164286    14.91   0.000      .212798    .2771968
+     yr_fe15 |   .2096135   .0164491    12.74   0.000     .1773737    .2418532
+     yr_fe16 |   .1448421   .0165674     8.74   0.000     .1123706    .1773135
+     yr_fe17 |   .1305991   .0166533     7.84   0.000     .0979592    .1632389
+     yr_fe18 |   .1989333   .0166492    11.95   0.000     .1663015     .231565
+     yr_fe19 |   .3135444   .0170199    18.42   0.000     .2801861    .3469027
+     yr_fe20 |   .3720275     .01717    21.67   0.000     .3383748    .4056802
+     yr_fe21 |   .2290826   .0172155    13.31   0.000     .1953408    .2628244
+     married |   .0141108   .0044589     3.16   0.002     .0053715    .0228502
+------------------------------------------------------------------------------
+
+. 
+. bysort bin_sp: gen idx_hazreg = _n
+
+. gen avg_hazard = .
+(650,922 missing values generated)
+
+. foreach k of numlist 1/22 24/46 {
+  2.     replace avg_hazard = _b[bin_dum`k'] ///
+>         if idx_hazreg == 1 & bin_dum`k' == 1
+  3. }
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+
+. replace avg_hazard = 0 ///
+>     if idx_hazreg == 1 & bin_sp != . & avg_hazard == .
+(1 real change made)
+
+. 
+. twoway ///
+>     scatter avg_hazard bin_sp if idx_hazreg == 1, ///
+>         xline(35.5) msize(medsmall) xlabel(12(6)60) ///
+>         graphregion(fcolor(white)) legend(off) ///
+>     || qfit avg_hazard bin_sp ///
+>         if bin_sp < 35.5 & idx_hazreg == 1 ///
+>     || qfit avg_hazard bin_sp ///
+>         if bin_sp > 35.5 & idx_hazreg == 1, ///
+>     title(Figure VI) ///
+>     subtitle(Job Finding Hazards Adjusted for Covariates) ///
+>     xtitle(Previous Job Tenure (Months)) ///
+>     ytitle(Average Daily Job Finding Hazard in First 20 Weeks)
+
+. graph export "$output/figures/figVI.png", replace
+(file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figVI.png not found)
+file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figVI.png saved as PNG
+    format
+
+. drop idx_hazreg avg_hazard
+
+. 
+. 
+. gen weeks_nonemp = 1 + int(noneduration/7)
+
+. stset weeks_nonemp, failure(no_reemploy == 0)
+
+Survival-time data settings
+
+         Failure event: no_reemploy==0
+Observed time interval: (0, weeks_nonemp]
+     Exit on or before: failure
+
+--------------------------------------------------------------------------
+    650,922  total observations
+          0  exclusions
+--------------------------------------------------------------------------
+    650,922  observations remaining, representing
+    601,152  failures in single-record/single-failure data
+   49197257  total analysis time at risk and under observation
+                                                At risk from t =         0
+                                     Earliest observed entry t =         0
+                                          Last observed exit t =     1,174
+
+. 
+. * -------------
+. * Figure VIIIa
+. * -------------
+. 
+. * Reset censoring for noneduration
+. capture drop censored
+
+. gen censored = no_reemploy | noneduration >= $cens_threshold
+
+. stset noneduration, failure(censored == 0)
+
+Survival-time data settings
+
+         Failure event: censored==0
+Observed time interval: (0, noneduration]
+     Exit on or before: failure
+
+--------------------------------------------------------------------------
+    650,922  total observations
+          0  exclusions
+--------------------------------------------------------------------------
+    650,922  observations remaining, representing
+    335,047  failures in single-record/single-failure data
+  341678305  total analysis time at risk and under observation
+                                                At risk from t =         0
+                                     Earliest observed entry t =         0
+                                          Last observed exit t =     8,214
+
+. capture drop avg_nonedur idx_cat
+
+. bysort bin_eb dur_under_2yr: gen idx_cat = _n if dur_under_2yr == 1
+(95,469 missing values generated)
+
+. bysort bin_eb: egen avg_nonedur = mean(noneduration) if dur_under_2yr == 1
+(95,469 missing values generated)
+
+. replace avg_nonedur = . if inlist(bin_eb, 12, 59)
+(0 real changes made)
+
+. 
+. twoway ///
+>     scatter avg_nonedur bin_eb if idx_cat == 1, ///
+>         msize(medsmall) xlabel(12(6)60) xline(35.5) ///
+>         graphregion(fcolor(white)) legend(off) ///
+>         yscale(range(132.5 167.5)) ylabel(135(5)165) ///
+>     || qfit avg_nonedur bin_eb ///
+>         if idx_cat == 1 & bin_eb < 35.5 ///
+>     || qfit avg_nonedur bin_eb ///
+>         if idx_cat == 1 & bin_eb > 35.5, ///
+>     title(Figure VIIIa) ///
+>     subtitle(Effect of Benefit Extension on Nonemployment Durations) ///
+>     xtitle(Months Employed in Past Five Years) ///
+>     ytitle(Mean Nonemployment Duration (Days))
+
+. graph export "$output/figures/figVIIIa.png", replace
+(file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figVIIIa.png not found)
+file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figVIIIa.png saved as PNG
+    format
+
+. drop avg_nonedur idx_cat
+
+. 
+. 
+. * -------------
+. * Figure VIIIb
+. * -------------
+. 
+. capture drop bin_dum*
+
+. tabulate bin_eb, gen(bin_dum)
+
+ Monthly EB |
+ dempl5 bin |
+   (35=just |
+      below |
+    cutoff, |
+    36=just |
+     above) |      Freq.     Percent        Cum.
+------------+-----------------------------------
+         13 |      6,695        1.10        1.10
+         14 |      7,189        1.18        2.28
+         15 |      7,646        1.26        3.54
+         16 |      7,975        1.31        4.85
+         17 |      8,478        1.39        6.24
+         18 |      8,972        1.47        7.72
+         19 |      8,971        1.47        9.19
+         20 |      9,076        1.49       10.68
+         21 |      9,136        1.50       12.18
+         22 |      9,307        1.53       13.71
+         23 |      9,602        1.58       15.29
+         24 |     10,264        1.69       16.98
+         25 |      9,776        1.61       18.58
+         26 |      9,961        1.64       20.22
+         27 |      9,809        1.61       21.83
+         28 |      9,944        1.63       23.46
+         29 |      9,987        1.64       25.11
+         30 |     10,034        1.65       26.75
+         31 |     10,127        1.66       28.42
+         32 |     10,235        1.68       30.10
+         33 |     10,380        1.71       31.81
+         34 |     10,513        1.73       33.53
+         35 |     10,848        1.78       35.32
+         36 |     11,442        1.88       37.20
+         37 |     12,718        2.09       39.29
+         38 |     12,130        1.99       41.28
+         39 |     11,838        1.95       43.22
+         40 |     11,807        1.94       45.16
+         41 |     11,871        1.95       47.11
+         42 |     12,098        1.99       49.10
+         43 |     13,118        2.16       51.26
+         44 |     13,147        2.16       53.42
+         45 |     13,585        2.23       55.65
+         46 |     14,086        2.31       57.97
+         47 |     15,346        2.52       60.49
+         48 |     15,653        2.57       63.06
+         49 |     19,916        3.27       66.33
+         50 |     18,722        3.08       69.41
+         51 |     21,814        3.58       72.99
+         52 |     19,956        3.28       76.27
+         53 |     20,906        3.44       79.71
+         54 |     20,425        3.36       83.06
+         55 |     21,761        3.58       86.64
+         56 |     23,120        3.80       90.44
+         57 |     25,557        4.20       94.64
+         58 |     32,640        5.36      100.00
+------------+-----------------------------------
+      Total |    608,581      100.00
+
+. 
+. capture drop idx_hazreg avg_hazard
+
+. stcox bin_dum1-bin_dum22 bin_dum24-bin_dum46 ///
+>       sp_eligible sp_poly1-sp_poly3 sp_x_poly1-sp_x_poly3 if bin_eb != ., nohr
+
+        Failure _d: censored==0
+  Analysis time _t: noneduration
+
+Iteration 0:  Log likelihood = -4049472.6
+Iteration 1:  Log likelihood = -4047642.4
+Iteration 2:  Log likelihood = -4047634.8
+Iteration 3:  Log likelihood = -4047634.8
+Refining estimates:
+Iteration 0:  Log likelihood = -4047634.8
+
+Cox regression with Breslow method for ties
+
+No. of subjects =   608,581                            Number of obs = 608,581
+No. of failures =   311,354
+Time at risk    = 321518934
+                                                       LR chi2(52)   = 3675.70
+Log likelihood = -4047634.8                            Prob > chi2   =  0.0000
+
+------------------------------------------------------------------------------
+          _t | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    bin_dum1 |   -.127179   .0227261    -5.60   0.000    -.1717214   -.0826366
+    bin_dum2 |  -.0741178    .021725    -3.41   0.001    -.1166981   -.0315375
+    bin_dum3 |  -.0758232   .0212062    -3.58   0.000    -.1173867   -.0342597
+    bin_dum4 |  -.0426613   .0207801    -2.05   0.040    -.0833895   -.0019331
+    bin_dum5 |  -.0203269   .0203272    -1.00   0.317    -.0601675    .0195136
+    bin_dum6 |   -.019758   .0200296    -0.99   0.324    -.0590153    .0194993
+    bin_dum7 |  -.0555649   .0201742    -2.75   0.006    -.0951056   -.0160242
+    bin_dum8 |  -.0129712   .0199275    -0.65   0.515    -.0520285     .026086
+    bin_dum9 |  -.0379595   .0199994    -1.90   0.058    -.0771576    .0012386
+   bin_dum10 |  -.0051643   .0198269    -0.26   0.795    -.0440244    .0336958
+   bin_dum11 |   .0107046   .0196287     0.55   0.586    -.0277668    .0491761
+   bin_dum12 |  -.0280092    .019454    -1.44   0.150    -.0661384      .01012
+   bin_dum13 |   -.030608   .0197061    -1.55   0.120    -.0692314    .0080153
+   bin_dum14 |  -.0252262   .0196117    -1.29   0.198    -.0636645    .0132121
+   bin_dum15 |  -.0224314   .0196908    -1.14   0.255    -.0610246    .0161619
+   bin_dum16 |  -.0268149   .0196285    -1.37   0.172     -.065286    .0116563
+   bin_dum17 |  -.0031895   .0195254    -0.16   0.870    -.0414585    .0350795
+   bin_dum18 |  -.0307961     .01957    -1.57   0.116    -.0691525    .0075604
+   bin_dum19 |  -.0066301    .019375    -0.34   0.732    -.0446045    .0313442
+   bin_dum20 |  -.0263964   .0193604    -1.36   0.173     -.064342    .0115493
+   bin_dum21 |    .010173   .0191352     0.53   0.595    -.0273312    .0476772
+   bin_dum22 |  -.0221399   .0191424    -1.16   0.247    -.0596584    .0153786
+   bin_dum24 |  -.0816979   .0192131    -4.25   0.000    -.1193549   -.0440409
+   bin_dum25 |  -.0886684   .0186531    -4.75   0.000    -.1252278   -.0521089
+   bin_dum26 |  -.0689912   .0188042    -3.67   0.000    -.1058468   -.0321356
+   bin_dum27 |  -.0667897   .0189366    -3.53   0.000    -.1039047   -.0296748
+   bin_dum28 |  -.0559797   .0189302    -2.96   0.003    -.0930821   -.0188772
+   bin_dum29 |  -.0757588   .0189771    -3.99   0.000    -.1129532   -.0385643
+   bin_dum30 |  -.0320167   .0187457    -1.71   0.088    -.0687576    .0047241
+   bin_dum31 |  -.0603475   .0184578    -3.27   0.001     -.096524   -.0241709
+   bin_dum32 |  -.0289197   .0183521    -1.58   0.115    -.0648891    .0070498
+   bin_dum33 |  -.0354521   .0182525    -1.94   0.052    -.0712263     .000322
+   bin_dum34 |  -.0292326   .0181041    -1.61   0.106     -.064716    .0062508
+   bin_dum35 |  -.0121801   .0177539    -0.69   0.493    -.0469771    .0226169
+   bin_dum36 |   .0020607   .0176184     0.12   0.907    -.0324706    .0365921
+   bin_dum37 |  -.1397696   .0171612    -8.14   0.000    -.1734049   -.1061343
+   bin_dum38 |  -.0152697   .0170923    -0.89   0.372    -.0487701    .0182307
+   bin_dum39 |   .0878612   .0164779     5.33   0.000     .0555651    .1201572
+   bin_dum40 |   .0254697   .0168359     1.51   0.130     -.007528    .0584675
+   bin_dum41 |   .0617739   .0166374     3.71   0.000     .0291652    .0943827
+   bin_dum42 |   .0983227   .0166646     5.90   0.000     .0656607    .1309846
+   bin_dum43 |   .1514893   .0164087     9.23   0.000     .1193289    .1836497
+   bin_dum44 |   .1670994   .0162589    10.28   0.000     .1352325    .1989662
+   bin_dum45 |   .2137702   .0160004    13.36   0.000     .1824101    .2451304
+   bin_dum46 |   .2497395   .0155268    16.08   0.000     .2193075    .2801715
+ sp_eligible |  -.1245816   .0176234    -7.07   0.000    -.1591228   -.0900403
+    sp_poly1 |    .215224   .0433926     4.96   0.000     .1301761    .3002718
+    sp_poly2 |   .2882622   .0463078     6.22   0.000     .1975006    .3790237
+    sp_poly3 |   .0867519   .0143036     6.07   0.000     .0587173    .1147865
+  sp_x_poly1 |  -.2286259     .07978    -2.87   0.004    -.3849919     -.07226
+  sp_x_poly2 |  -.3176533   .0979478    -3.24   0.001    -.5096275   -.1256791
+  sp_x_poly3 |  -.1061548   .0339767    -3.12   0.002     -.172748   -.0395616
+------------------------------------------------------------------------------
+
+. bysort bin_eb: gen idx_hazreg = _n
+
+. gen avg_hazard = .
+(650,922 missing values generated)
+
+. foreach k of numlist 1/22 24/46 {
+  2.     replace avg_hazard = _b[bin_dum`k'] ///
+>         if idx_hazreg == 1 & bin_dum`k' == 1
+  3. }
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+
+. replace avg_hazard = 0 ///
+>     if idx_hazreg == 1 & bin_eb != . & avg_hazard == .
+(1 real change made)
+
+. 
+. twoway ///
+>     scatter avg_hazard bin_eb if idx_hazreg == 1, ///
+>         xline(35.5) msize(medsmall) xlabel(12(6)60) ///
+>         graphregion(fcolor(white)) legend(off) ///
+>     || qfit avg_hazard bin_eb ///
+>         if bin_eb < 35.5 & idx_hazreg == 1 ///
+>     || qfit avg_hazard bin_eb ///
+>         if bin_eb > 35.5 & idx_hazreg == 1, ///
+>     title(Figure VIIIb) ///
+>     subtitle(Effect of Extended Benefits on Job Finding Hazards) ///
+>     xtitle(Months Employed in Past Five Years) ///
+>     ytitle(Average Daily Job Finding Hazard in First 20 Weeks)
+
+. graph export "$output/figures/figVIIIb.png", replace
+(file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figVIIIb.png not found)
+file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figVIIIb.png saved as PNG
+    format
+
+. drop idx_hazreg avg_hazard bin_dum*
+
+. 
+. * ----------
+. * Figure Xa
+. * ----------
+. 
+. capture drop mean_wchange_sp idx_wchange
+
+. bysort bin_sp: egen mean_wchange_sp = mean(log_wage_growth)
+
+. gen temp = (log_wage_growth == .)
+
+. bysort bin_sp temp: gen idx_wchange = _n if log_wage_growth != .
+(97,315 missing values generated)
+
+. drop temp
+
+. 
+. twoway ///
+>     scatter mean_wchange_sp bin_sp if idx_wchange == 1, ///
+>         msize(medsmall) xlabel(12(6)60) xline(35.5) ///
+>         graphregion(fcolor(white)) legend(off) ///
+>         yscale(range(-.1 0.01)) ylabel(-.1(.02)0) ///
+>     || lfit mean_wchange_sp bin_sp ///
+>         if idx_wchange == 1 & bin_sp < 35.5 ///
+>     || lfit mean_wchange_sp bin_sp ///
+>         if idx_wchange == 1 & bin_sp > 35.5, ///
+>     title(Figure Xa) ///
+>     subtitle(Effect of Severance Pay on Subsequent Wages) ///
+>     xtitle(Previous Job Tenure (Months)) ///
+>     ytitle(Wage Growth)
+
+. graph export "$output/figures/figXa.png", replace
+(file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figXa.png not found)
+file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figXa.png saved as PNG
+    format
+
+. drop mean_wchange_sp idx_wchange
+
+. 
+. 
+. * ----------
+. * Figure Xb
+. * ----------
+. 
+. * Set up survival time for NEXT-JOB duration
+. stset nextjob_dur_mths if indnemp == 1, failure(nextjob_censored == 0)
+
+Survival-time data settings
+
+         Failure event: nextjob_censored==0
+Observed time interval: (0, nextjob_dur_mths]
+     Exit on or before: failure
+      Keep observations 
+                if exp: indnemp == 1
+
+--------------------------------------------------------------------------
+    650,922  total observations
+     49,770  ignored at outset because of if exp
+--------------------------------------------------------------------------
+    601,152  observations remaining, representing
+    507,397  failures in single-record/single-failure data
+   13309654  total analysis time at risk and under observation
+                                                At risk from t =         0
+                                     Earliest observed entry t =         0
+                                          Last observed exit t =       265
+
+. 
+. * Group-dummies Cox: one coefficient per SP tenure bin
+. capture drop bin_dum*
+
+. tabulate bin_sp, gen(bin_dum)
+
+ Monthly SP |
+ tenure bin |
+   (35=just |
+      below |
+    cutoff, |
+    36=just |
+     above) |      Freq.     Percent        Cum.
+------------+-----------------------------------
+         13 |     40,944        6.55        6.55
+         14 |     38,052        6.09       12.64
+         15 |     36,783        5.88       18.52
+         16 |     33,780        5.40       23.92
+         17 |     31,229        5.00       28.92
+         18 |     30,555        4.89       33.81
+         19 |     26,474        4.23       38.04
+         20 |     25,311        4.05       42.09
+         21 |     24,041        3.85       45.94
+         22 |     22,228        3.56       49.49
+         23 |     20,388        3.26       52.75
+         24 |     19,965        3.19       55.95
+         25 |     15,978        2.56       58.50
+         26 |     14,732        2.36       60.86
+         27 |     14,836        2.37       63.23
+         28 |     14,002        2.24       65.47
+         29 |     13,534        2.16       67.64
+         30 |     12,616        2.02       69.66
+         31 |     12,055        1.93       71.58
+         32 |     11,702        1.87       73.46
+         33 |     10,854        1.74       75.19
+         34 |     10,673        1.71       76.90
+         35 |     10,974        1.76       78.66
+         36 |      9,824        1.57       80.23
+         37 |      8,210        1.31       81.54
+         38 |      7,989        1.28       82.82
+         39 |      8,080        1.29       84.11
+         40 |      7,394        1.18       85.29
+         41 |      7,067        1.13       86.42
+         42 |      6,787        1.09       87.51
+         43 |      6,524        1.04       88.55
+         44 |      6,517        1.04       89.60
+         45 |      6,051        0.97       90.56
+         46 |      5,853        0.94       91.50
+         47 |      6,115        0.98       92.48
+         48 |      4,857        0.78       93.26
+         49 |      4,669        0.75       94.00
+         50 |      4,681        0.75       94.75
+         51 |      4,639        0.74       95.49
+         52 |      4,438        0.71       96.20
+         53 |      4,407        0.70       96.91
+         54 |      3,997        0.64       97.55
+         55 |      4,039        0.65       98.19
+         56 |      3,924        0.63       98.82
+         57 |      3,808        0.61       99.43
+         58 |      3,560        0.57      100.00
+------------+-----------------------------------
+      Total |    625,136      100.00
+
+. 
+. capture drop idx_hazreg_c mean_hazrate_c
+
+. stcox bin_dum1-bin_dum22 bin_dum24-bin_dum46 ///
+>           if bin_sp != ., nohr
+
+        Failure _d: nextjob_censored==0
+  Analysis time _t: nextjob_dur_mths
+
+Iteration 0:  Log likelihood = -6138167.9
+Iteration 1:  Log likelihood = -6136935.7
+Iteration 2:  Log likelihood = -6136934.6
+Iteration 3:  Log likelihood = -6136934.6
+Refining estimates:
+Iteration 0:  Log likelihood = -6136934.6
+
+Cox regression with Breslow method for ties
+
+No. of subjects =    577,322                           Number of obs = 577,322
+No. of failures =    486,727
+Time at risk    = 12,851,045
+                                                       LR chi2(45)   = 2466.65
+Log likelihood = -6136934.6                            Prob > chi2   =  0.0000
+
+------------------------------------------------------------------------------
+          _t | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    bin_dum1 |   .2000302   .0123038    16.26   0.000     .1759152    .2241452
+    bin_dum2 |   .1880716   .0123967    15.17   0.000     .1637746    .2123686
+    bin_dum3 |   .1749645   .0124412    14.06   0.000     .1505803    .1993488
+    bin_dum4 |   .1702875   .0125637    13.55   0.000     .1456631     .194912
+    bin_dum5 |   .1583548   .0126861    12.48   0.000     .1334905    .1832192
+    bin_dum6 |   .1633039   .0127245    12.83   0.000     .1383644    .1882435
+    bin_dum7 |   .1410643   .0129904    10.86   0.000     .1156035    .1665251
+    bin_dum8 |    .138019   .0130825    10.55   0.000     .1123777    .1636602
+    bin_dum9 |   .1108315    .013198     8.40   0.000     .0849639    .1366992
+   bin_dum10 |   .0971023   .0133592     7.27   0.000     .0709188    .1232859
+   bin_dum11 |   .0829406   .0135651     6.11   0.000     .0563536    .1095277
+   bin_dum12 |   .0834245   .0136549     6.11   0.000     .0566614    .1101876
+   bin_dum13 |   .0832589   .0142086     5.86   0.000     .0554105    .1111073
+   bin_dum14 |   .0757211   .0144412     5.24   0.000     .0474169    .1040252
+   bin_dum15 |   .0705589   .0144337     4.89   0.000     .0422693    .0988485
+   bin_dum16 |   .0604586   .0146624     4.12   0.000     .0317209    .0891964
+   bin_dum17 |   .0585065     .01475     3.97   0.000     .0295971    .0874159
+   bin_dum18 |   .0506381   .0149948     3.38   0.001     .0212488    .0800273
+   bin_dum19 |   .0526853   .0151618     3.47   0.001     .0229687     .082402
+   bin_dum20 |   .0388927   .0153008     2.54   0.011     .0089037    .0688818
+   bin_dum21 |   .0251566   .0155923     1.61   0.107    -.0054037    .0557169
+   bin_dum22 |   .0434482   .0156342     2.78   0.005     .0128057    .0740907
+   bin_dum24 |   .0025864   .0160799     0.16   0.872    -.0289297    .0341025
+   bin_dum25 |   .0101137   .0168648     0.60   0.549    -.0229407    .0431681
+   bin_dum26 |   .0217674   .0169401     1.28   0.199    -.0114345    .0549693
+   bin_dum27 |   .0155277   .0169474     0.92   0.360    -.0176885     .048744
+   bin_dum28 |   .0320845   .0173683     1.85   0.065    -.0019566    .0661257
+   bin_dum29 |   .0225079   .0175938     1.28   0.201    -.0119754    .0569911
+   bin_dum30 |   .0015594   .0178335     0.09   0.930    -.0333936    .0365124
+   bin_dum31 |   .0291853   .0180699     1.62   0.106    -.0062312    .0646017
+   bin_dum32 |   .0044586   .0181134     0.25   0.806     -.031043    .0399601
+   bin_dum33 |   .0047771   .0185512     0.26   0.797    -.0315826    .0411369
+   bin_dum34 |   .0166249   .0186934     0.89   0.374    -.0200134    .0532632
+   bin_dum35 |  -.0403083   .0186162    -2.17   0.030    -.0767953   -.0038213
+   bin_dum36 |   .0017169   .0200128     0.09   0.932    -.0375075    .0409413
+   bin_dum37 |  -.0245777   .0203346    -1.21   0.227    -.0644328    .0152773
+   bin_dum38 |   .0012513   .0203094     0.06   0.951    -.0385545    .0410571
+   bin_dum39 |   .0046459   .0203409     0.23   0.819    -.0352215    .0445133
+   bin_dum40 |  -.0431631   .0207185    -2.08   0.037    -.0837705   -.0025556
+   bin_dum41 |  -.0307506   .0208251    -1.48   0.140     -.071567    .0100658
+   bin_dum42 |  -.0106836   .0215081    -0.50   0.619    -.0528386    .0314714
+   bin_dum43 |   -.027029      .0215    -1.26   0.209    -.0691682    .0151101
+   bin_dum44 |  -.0117853   .0216149    -0.55   0.586    -.0541497    .0305791
+   bin_dum45 |  -.0373723   .0219947    -1.70   0.089     -.080481    .0057365
+   bin_dum46 |  -.0592989    .022698    -2.61   0.009    -.1037861   -.0148117
+------------------------------------------------------------------------------
+
+. bysort bin_sp: gen idx_hazreg_c = _n
+
+. gen mean_hazrate_c = .
+(650,922 missing values generated)
+
+. foreach k of numlist 1/22 24/46 {
+  2.         replace mean_hazrate_c = _b[bin_dum`k'] ///
+>                 if idx_hazreg_c == 1 & bin_dum`k' == 1
+  3. }
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+
+. replace mean_hazrate_c = 0 ///
+>         if idx_hazreg_c == 1 & bin_sp != . & mean_hazrate_c == .
+(1 real change made)
+
+. 
+. twoway ///
+>         scatter mean_hazrate_c bin_sp if idx_hazreg_c == 1, ///
+>                 xline(35.5) msize(medsmall) xlabel(12(6)60) ///
+>                 graphregion(fcolor(white)) legend(off) ///
+>         || qfit mean_hazrate_c bin_sp ///
+>                 if bin_sp < 35.5 & idx_hazreg_c == 1 ///
+>         || qfit mean_hazrate_c bin_sp ///
+>                 if bin_sp > 35.5 & idx_hazreg_c == 1, ///
+>         title(Figure Xb) ///
+>         subtitle(Effect of Severance Pay on Subsequent Job Duration) ///
+>         xtitle(Previous Job Tenure (Months)) ///
+>         ytitle(Average Monthly Job Ending Hazard in Next Job)
+
+. graph export "$output/figures/figXb.png", replace
+(file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figXb.png not found)
+file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/output/figures/figXb.png saved as PNG
+    format
+
+. drop idx_hazreg_c mean_hazrate_c bin_dum*
+
+. 
+. capture log close

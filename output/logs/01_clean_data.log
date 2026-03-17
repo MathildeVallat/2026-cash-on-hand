@@ -1,0 +1,526 @@
+-----------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\vallatm\Desktop\PEP\Mathilde_Vallat\output/logs/01_clean_data.log
+  log type:  text
+ opened on:  15 Mar 2026, 01:27:14
+
+. use "$raw/sample_75_02.dta", clear
+
+. 
+. count
+  1,485,831
+
+. display "Raw observations before any restrictions: " r(N)
+Raw observations before any restrictions: 1485831
+
+. 
+. * The SP and EB eligibility cutoff is exactly 3 years = 1,095 days
+. global sp_cutoff = 3 * 365    // = 1095
+
+. * 31-day "month" for bucketing the running variable into bins
+. global bin_width = 31
+
+. * UI censoring threshold: 20 weeks = 140 days (for survival analysis)
+. global cens_threshold = 140
+
+. 
+. *------
+. * Merge
+. *------
+. 
+. sort penr file
+
+. merge 1:1 penr file using "$raw/work_history.dta"
+(label typ already defined)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         1,485,831  (_merge==3)
+    -----------------------------------------
+
+. tabulate _merge    // inspect match quality
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+            Matched (3) |  1,485,831      100.00      100.00
+------------------------+-----------------------------------
+                  Total |  1,485,831      100.00
+
+. keep if _merge == 3
+(0 observations deleted)
+
+. drop _merge
+
+. count
+  1,485,831
+
+. display "Observations after merging with work history: " r(N)
+Observations after merging with work history: 1485831
+
+. 
+. 
+. *---------------------
+. * Sample restrictions
+. *---------------------
+. 
+. * Restrict to layoffs in calendar years 1981–2001
+. keep if endy > 1980 & endy < 2002
+(224,285 observations deleted)
+
+. * Drop voluntary quits — their job search behaviour is self-selected
+. drop if volquit == 1
+(101,643 observations deleted)
+
+. * Drop observations with missing or invalid region code
+. drop if region == 0
+(0 observations deleted)
+
+. * Drop recalls to the same employer — these are not genuine new job searches
+. drop if recall == 1
+(219,953 observations deleted)
+
+. * Tenure window: workers must have 1 to 5 years of tenure at the lost job
+. *     This keeps the sample in a range where the SP cutoff is economically
+. *     meaningful and where both sides of the RD have adequate mass.
+. keep if duration >= 365 & duration < 5 * 365
+(221,420 observations deleted)
+
+. * Employment history window: same 1–5 year window applied to dempl5
+. *     (days employed in the past 5 years — the EB running variable)
+. keep if dempl5 >= 365 & dempl5 < 5 * 365
+(67,608 observations deleted)
+
+. count
+  650,922
+
+. display "Observations after all sample restrictions: " r(N)
+Observations after all sample restrictions: 650922
+
+. 
+. 
+. *------------------------------------------
+. * Harmonise region codes (avoid thin cells)
+. *------------------------------------------
+. 
+. replace region = 8 if region == 9
+(0 real changes made)
+
+. replace region = 5 if region == 3
+(0 real changes made)
+
+. replace region = 5 if region == 6
+(0 real changes made)
+
+. capture replace ne_region = 8 if ne_region == 9
+
+. capture replace ne_region = 5 if ne_region == 3
+
+. capture replace ne_region = 5 if ne_region == 6
+
+. 
+. *---------------------
+. * Treatment indicators
+. *---------------------
+. 
+. * Severance pay eligibility: worker's tenure at the lost job >= 3 years
+. * (capture drop in case the raw dataset already contains this variable)
+. capture drop sp_eligible
+
+. gen sp_eligible     = (duration >= $sp_cutoff)
+
+. label var sp_eligible "=1 if eligible for severance pay (tenure >= 1095 days)"
+
+. * Extended UI eligibility: days employed in past 5 years >= 3 years
+. * (capture drop in case the raw dataset already contains this variable)
+. capture drop eb_eligible
+
+. gen eb_eligible  = (dempl5   >= $sp_cutoff)
+
+. label var eb_eligible "=1 if eligible for 30-week UI (dempl5 >= 1095 days)"
+
+. tabulate sp_eligible,    miss
+
+      =1 if |
+   eligible |
+        for |
+  severance |
+pay (tenure |
+    >= 1095 |
+      days) |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |    515,663       79.22       79.22
+          1 |    135,259       20.78      100.00
+------------+-----------------------------------
+      Total |    650,922      100.00
+
+. tabulate eb_eligible, miss
+
+      =1 if |
+   eligible |
+for 30-week |
+ UI (dempl5 |
+    >= 1095 |
+      days) |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |    218,820       33.62       33.62
+          1 |    432,102       66.38      100.00
+------------+-----------------------------------
+      Total |    650,922      100.00
+
+. 
+. *-------------------------------------------
+. * Running variables recentered at the cutoff
+. *-------------------------------------------
+. 
+. gen rv_sp = duration - $sp_cutoff
+
+. label var rv_sp "Tenure minus SP cutoff (days, centred at 0)"
+
+. gen rv_eb = dempl5 - $sp_cutoff
+
+. label var rv_eb "dempl5 minus EB cutoff (days, centred at 0)"
+
+. summarize rv_sp rv_eb
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+       rv_sp |    650,922    -300.961    369.7366       -730        729
+       rv_eb |    650,922    179.4158    427.5484       -730        729
+
+. 
+. *----------------------------------------------------
+. * Monthly category bins for RD binned-scatter figures
+. *----------------------------------------------------
+. 
+. * SP bins
+. gen bin_sp = .
+(650,922 missing values generated)
+
+. replace bin_sp = int( rv_sp        / $bin_width) + 36  ///
+>     if rv_sp >= 0
+(135,259 real changes made)
+
+. replace bin_sp = int((rv_sp + 1)   / $bin_width) + 35  ///
+>     if rv_sp <  0
+(515,663 real changes made)
+
+. * EB bins
+. gen bin_eb = .
+(650,922 missing values generated)
+
+. replace bin_eb = int( rv_eb        / $bin_width) + 36  ///
+>     if rv_eb >= 0
+(432,102 real changes made)
+
+. replace bin_eb = int((rv_eb + 1)   / $bin_width) + 35  ///
+>     if rv_eb <  0
+(218,820 real changes made)
+
+. 
+. * Drop outermost bins to avoid edge effects (bins 12 and 59 are boundary bins
+. * at the very ends of the 1–5 year window, which have fewer observations
+. * and can distort the visual fit at the extremes of figures)
+. replace bin_sp = . if bin_sp == 12 | bin_sp == 59
+(25,786 real changes made, 25,786 to missing)
+
+. replace bin_eb = . if bin_eb == 12 | bin_eb == 59
+(42,341 real changes made, 42,341 to missing)
+
+. label var bin_sp "Monthly SP tenure bin (35=just below cutoff, 36=just above)"
+
+. label var bin_eb "Monthly EB dempl5 bin (35=just below cutoff, 36=just above)"
+
+. 
+. 
+. *---------------------------
+. * Prior employment indicator
+. *---------------------------
+. gen had_prior_job = (dempl5 - duration > 30) if !missing(dempl5, duration)
+
+. label var had_prior_job "=1 if worker had prior employment (dempl5 > duration + 30 days)"
+
+. 
+. *------------------------------------------
+. * Additional outcome and control variables
+. *------------------------------------------
+. 
+. * Log wage controls
+. gen log_wage  = ln(wage0)
+(10,398 missing values generated)
+
+. gen log_wage_sq = log_wage^2
+(10,398 missing values generated)
+
+. label var log_wage  "Log daily wage at job loss"
+
+. label var log_wage_sq "Log daily wage squared"
+
+. * Age squared
+. gen age_sq = age^2
+
+. label var age_sq "Age squared"
+
+. * Education indicator (above_basic_ed = 1 if above basic schooling level)
+. gen above_basic_ed = (education > 1) if education != .
+(75,955 missing values generated)
+
+. label var above_basic_ed "=1 if education above basic level"
+
+. * Wage change at re-employment (key outcome for model testing)
+. gen log_wage_growth = ln(ne_wage0) - ln(wage0)
+(97,315 missing values generated)
+
+. label var log_wage_growth "Log re-employment wage minus log previous wage"
+
+. * Annual wage approximation (Austrian convention: daily wage × 14)
+. gen annual_wage = wage0 * 14
+(9,307 missing values generated)
+
+. label var annual_wage "Approximate annual wage (daily × 14)"
+
+. * Blue-collar indicator from previous job (from work history)
+. capture gen prev_bluecollar = (last_etyp == 2) if last_etyp != .
+
+. capture label var prev_bluecollar "=1 if previous job was blue-collar"
+
+. * Verify these raw work_history variables survived the merge
+. capture confirm variable experience
+
+. if _rc != 0 display as error "WARNING: experience not found — check work_history merge"
+
+. capture confirm variable firms
+
+. if _rc != 0 display as error "WARNING: firms not found — check work_history merge"
+
+. * Work history derived variables (from work history)
+. capture gen  experience_sq      = experience^2          if !missing(experience)
+
+. capture gen  prev_had_nonedur   = (last_nonedur > 0)    if !missing(last_nonedur)
+
+. capture label var experience_sq      "Work experience squared (days)"
+
+. capture label var prev_had_nonedur   "=1 if positive nonemployment before current job"
+
+. 
+. 
+. *---------------------------------------------------------------
+. * Polynomial terms in the running variables for the hazard model
+. *----------------------------------------------------------------
+. 
+. * SP polynomials (scaled to years)
+. gen sp_poly1 = rv_sp / 365
+
+. gen sp_poly2 = sp_poly1^2
+
+. gen sp_poly3 = sp_poly1^3
+
+. gen sp_poly4 = sp_poly1^4    // available for higher-order robustness checks
+
+. * SP interactions: sp_eligible × polynomial (different slope above cutoff)
+. gen sp_x_poly1 = sp_eligible * sp_poly1
+
+. gen sp_x_poly2 = sp_eligible * sp_poly2
+
+. gen sp_x_poly3 = sp_eligible * sp_poly3
+
+. gen sp_x_poly4 = sp_eligible * sp_poly4
+
+. label var sp_poly1 "Recentered tenure in years (linear)"
+
+. label var sp_poly2 "Recentered tenure in years (squared)"
+
+. label var sp_poly3 "Recentered tenure in years (cubed)"
+
+. label var sp_x_poly1  "SP eligibility × sp_poly1"
+
+. label var sp_x_poly2  "SP eligibility × sp_poly2"
+
+. label var sp_x_poly3  "SP eligibility × sp_poly3"
+
+. * EB polynomials (scaled to years)
+. gen eb_poly1 = rv_eb / 365
+
+. gen eb_poly2 = eb_poly1^2
+
+. gen eb_poly3 = eb_poly1^3
+
+. gen eb_poly4 = eb_poly1^4
+
+. * EB interactions: eb_eligible × polynomial
+. gen eb_x_poly1 = eb_eligible * eb_poly1
+
+. gen eb_x_poly2 = eb_eligible * eb_poly2
+
+. gen eb_x_poly3 = eb_eligible * eb_poly3
+
+. gen eb_x_poly4 = eb_eligible * eb_poly4
+
+. label var eb_poly1    "Recentered dempl5 in years (linear)"
+
+. label var eb_poly2    "Recentered dempl5 in years (squared)"
+
+. label var eb_poly3    "Recentered dempl5 in years (cubed)"
+
+. label var eb_x_poly1 "EB eligibility × eb_poly1"
+
+. label var eb_x_poly2 "EB eligibility × eb_poly2"
+
+. label var eb_x_poly3 "EB eligibility × eb_poly3"
+
+. 
+. *-----------------
+. * Calendar dummies
+. *-----------------
+. 
+. tabulate endmo,  gen(mo_fe)   // 12 month-of-year indicators (Jan = omitted)
+
+      endmo |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          1 |     46,567        7.15        7.15
+          2 |     45,612        7.01       14.16
+          3 |     60,826        9.34       23.51
+          4 |     47,690        7.33       30.83
+          5 |     43,952        6.75       37.58
+          6 |     57,040        8.76       46.35
+          7 |     49,849        7.66       54.01
+          8 |     52,161        8.01       62.02
+          9 |     63,478        9.75       71.77
+         10 |     55,107        8.47       80.24
+         11 |     51,381        7.89       88.13
+         12 |     77,259       11.87      100.00
+------------+-----------------------------------
+      Total |    650,922      100.00
+
+. tabulate endy,   gen(yr_fe)    // year-of-job-loss indicators
+
+       endy |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       1981 |     18,545        2.85        2.85
+       1982 |     23,124        3.55        6.40
+       1983 |     21,799        3.35        9.75
+       1984 |     20,965        3.22       12.97
+       1985 |     21,824        3.35       16.32
+       1986 |     26,555        4.08       20.40
+       1987 |     26,710        4.10       24.51
+       1988 |     27,436        4.21       28.72
+       1989 |     25,590        3.93       32.65
+       1990 |     28,957        4.45       37.10
+       1991 |     33,054        5.08       42.18
+       1992 |     39,646        6.09       48.27
+       1993 |     42,791        6.57       54.84
+       1994 |     37,453        5.75       60.60
+       1995 |     37,967        5.83       66.43
+       1996 |     37,770        5.80       72.23
+       1997 |     36,072        5.54       77.78
+       1998 |     35,470        5.45       83.22
+       1999 |     35,110        5.39       88.62
+       2000 |     34,696        5.33       93.95
+       2001 |     39,388        6.05      100.00
+------------+-----------------------------------
+      Total |    650,922      100.00
+
+. tabulate region, gen(region_fe)     // region fixed effects
+
+     region |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          1 |    182,533       30.01       30.01
+          2 |    103,099       16.95       46.97
+          4 |     98,429       16.18       63.15
+          5 |    117,633       19.34       82.49
+          7 |     42,066        6.92       89.41
+          8 |     64,392       10.59      100.00
+------------+-----------------------------------
+      Total |    608,152      100.00
+
+. 
+. *-------------------------------------------
+. * Censoring indicator for survival analysis
+. *-------------------------------------------
+. 
+. * no_reemploy: =1 if the worker never found a new job by end of data.
+. * In the raw data, ne_start == 15887 is the sentinel value meaning "no next job observed".
+. capture drop no_reemploy
+
+. gen no_reemploy = (ne_start == 15887)
+
+. label var no_reemploy "=1 if no re-employment observed by end of data"
+
+. gen censored = (no_reemploy == 1) | (noneduration >= $cens_threshold)
+
+. label var censored "=1 if spell censored (no re-employment within 20-week window)"
+
+. gen neg_start = -start
+
+. sort penr neg_start
+
+. drop neg_start
+
+. by penr: gen spell_n  = _n
+
+. by penr: gen n_spells = _N
+
+. 
+. *----------------------
+. * Elements for analysis
+. *----------------------
+. 
+. gen nextjob_dur_mths  = 1 + int(ne_duration / $bin_width)
+
+. gen nextjob_censored = (ne_start + ne_duration >= td(1jul2003)) if indnemp == 1
+(49,770 missing values generated)
+
+. replace nextjob_censored = 1 if ne_duration > 5 * 365
+(36,026 real changes made)
+
+. bysort benr endy endmo: gen firm_mth_layoffs = _N
+
+. capture drop multi_layoff
+
+. gen multi_layoff = (firm_mth_layoffs >= 4)
+
+. 
+. *------
+. * Save
+. *------
+. 
+. compress
+  variable durationm was int now byte
+  variable sp_eligible was float now byte
+  variable eb_eligible was float now byte
+  variable rv_sp was float now int
+  variable rv_eb was float now int
+  variable bin_sp was float now byte
+  variable bin_eb was float now byte
+  variable had_prior_job was float now byte
+  variable age_sq was float now int
+  variable above_basic_ed was float now byte
+  variable prev_bluecollar was float now byte
+  variable prev_had_nonedur was float now byte
+  variable no_reemploy was float now byte
+  variable censored was float now byte
+  variable spell_n was float now byte
+  variable n_spells was float now byte
+  variable nextjob_dur_mths was float now int
+  variable nextjob_censored was float now byte
+  variable firm_mth_layoffs was float now int
+  variable multi_layoff was float now byte
+  variable penr was double now long
+  (37,102,554 bytes saved)
+
+. save "$clean/analysis_dataset.dta", replace
+file C:/Users/vallatm/Desktop/PEP/Mathilde_Vallat/data/clean/analysis_dataset.dta saved
+
+. 
+. display _newline "Clean dataset saved: data/clean/analysis_dataset.dta"
+
+Clean dataset saved: data/clean/analysis_dataset.dta
+
+. 
+. log close
+      name:  <unnamed>
+       log:  C:\Users\vallatm\Desktop\PEP\Mathilde_Vallat\output/logs/01_clean_data.log
+  log type:  text
+ closed on:  15 Mar 2026, 01:27:18
+-----------------------------------------------------------------------------------------------
